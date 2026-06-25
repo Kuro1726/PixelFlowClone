@@ -1011,9 +1011,9 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P1-06** Implement `GameConfigSO` + tạo asset `ScriptableObjects/Config/GameConfig.asset`
 - [x] **P1-07** Implement `LevelDataSO` với `OnValidate()` kiểm tra `BlockMatrix.Length`
 - [x] **P1-08** Tạo `ScriptableObjects/Levels/Level_001.asset` (grid 5×5, 2 màu, 3 collectors)
-- [ ] **P1-09** Implement `Singleton<T>` tại `Scripts/Core/Singleton.cs`
-- [ ] **P1-10** Implement `GameState` enum tại `Scripts/Core/GameState.cs`
-- [ ] **P1-11** Implement `GameEvents` static class tại `Scripts/Core/GameEvents.cs`
+- [x] **P1-09** Implement `Singleton<T>` tại `Scripts/Core/Singleton.cs`
+- [x] **P1-10** Implement `GameState` enum tại `Scripts/Core/GameState.cs`
+- [x] **P1-11** Implement `GameEvents` static class tại `Scripts/Core/GameEvents.cs`
 - [ ] **P1-12** Tạo prefab `PF_PixelBlock` (SpriteRenderer + BoxCollider2D + layer `PixelBlock`)
 - [ ] **P1-13** Tạo prefab `PF_CollectorUnit` (SpriteRenderer + Rigidbody2D Kinematic + TMP capacity label)
 - [ ] **P1-14** Implement `PixelBlock.cs` với `Color`, `GridPosition`, `Consume()`, `ResetFromPool()`
