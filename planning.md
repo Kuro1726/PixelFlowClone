@@ -1017,8 +1017,8 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P1-12** Tạo prefab `PF_PixelBlock` (SpriteRenderer + BoxCollider2D + layer `PixelBlock`)
 - [x] **P1-13** Tạo prefab `PF_CollectorUnit` (SpriteRenderer + Rigidbody2D Kinematic + TMP capacity label)
 - [x] **P1-14** Implement `PixelBlock.cs` với `Color`, `GridPosition`, `Consume()`, `ResetFromPool()`
-- [ ] **P1-15** Implement `PoolManager.cs` với `ObjectPool<CollectorUnit>` và `ObjectPool<PixelBlock>`
-- [ ] **P1-16** Implement `PoolManager.Prewarm(LevelDataSO, GameConfigSO)`
+- [x] **P1-15** Implement `PoolManager.cs` với `ObjectPool<CollectorUnit>` và `ObjectPool<PixelBlock>`
+- [x] **P1-16** Implement `PoolManager.Prewarm(LevelDataSO, GameConfigSO)`
 - [ ] **P1-17** Implement `GridManager.SpawnGrid(LevelDataSO)` — world positioning từ `GridOrigin` + `CellSpacing`
 - [ ] **P1-18** Implement `GridManager.TryConsumeBlock(ColorId, Vector2Int)` — release block về pool
 - [ ] **P1-19** Implement `GridManager.RemainingBlocks` property

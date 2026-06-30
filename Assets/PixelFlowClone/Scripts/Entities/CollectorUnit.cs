@@ -51,6 +51,11 @@ namespace PixelFlowClone.Entities
             RefreshCapacityLabel();
         }
 
+        public void OnSpawnFromPool()
+        {
+            // Reserved for re-enabling colliders / VFX when pulled from the pool.
+        }
+
         public void ResetFromPool()
         {
             Color = ColorId.None;
