@@ -1019,7 +1019,7 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P1-14** Implement `PixelBlock.cs` với `Color`, `GridPosition`, `Consume()`, `ResetFromPool()`
 - [x] **P1-15** Implement `PoolManager.cs` với `ObjectPool<CollectorUnit>` và `ObjectPool<PixelBlock>`
 - [x] **P1-16** Implement `PoolManager.Prewarm(LevelDataSO, GameConfigSO)`
-- [ ] **P1-17** Implement `GridManager.SpawnGrid(LevelDataSO)` — world positioning từ `GridOrigin` + `CellSpacing`
+- [x] **P1-17** Implement `GridManager.SpawnGrid(LevelDataSO)` — world positioning từ `GridOrigin` + `CellSpacing`
 - [ ] **P1-18** Implement `GridManager.TryConsumeBlock(ColorId, Vector2Int)` — release block về pool
 - [ ] **P1-19** Implement `GridManager.RemainingBlocks` property
 - [ ] **P1-20** Implement `ConveyorWaypoint.cs` với gizmo draw
