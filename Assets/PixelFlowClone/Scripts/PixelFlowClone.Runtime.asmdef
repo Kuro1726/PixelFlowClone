@@ -1,7 +1,10 @@
 {
     "name": "PixelFlowClone.Runtime",
     "rootNamespace": "PixelFlowClone",
-    "references": [],
+    "references": [
+        "Unity.TextMeshPro",
+        "Unity.InputSystem"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

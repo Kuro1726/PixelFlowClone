@@ -1014,9 +1014,9 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P1-09** Implement `Singleton<T>` tại `Scripts/Core/Singleton.cs`
 - [x] **P1-10** Implement `GameState` enum tại `Scripts/Core/GameState.cs`
 - [x] **P1-11** Implement `GameEvents` static class tại `Scripts/Core/GameEvents.cs`
-- [ ] **P1-12** Tạo prefab `PF_PixelBlock` (SpriteRenderer + BoxCollider2D + layer `PixelBlock`)
-- [ ] **P1-13** Tạo prefab `PF_CollectorUnit` (SpriteRenderer + Rigidbody2D Kinematic + TMP capacity label)
-- [ ] **P1-14** Implement `PixelBlock.cs` với `Color`, `GridPosition`, `Consume()`, `ResetFromPool()`
+- [x] **P1-12** Tạo prefab `PF_PixelBlock` (SpriteRenderer + BoxCollider2D + layer `PixelBlock`)
+- [x] **P1-13** Tạo prefab `PF_CollectorUnit` (SpriteRenderer + Rigidbody2D Kinematic + TMP capacity label)
+- [x] **P1-14** Implement `PixelBlock.cs` với `Color`, `GridPosition`, `Consume()`, `ResetFromPool()`
 - [ ] **P1-15** Implement `PoolManager.cs` với `ObjectPool<CollectorUnit>` và `ObjectPool<PixelBlock>`
 - [ ] **P1-16** Implement `PoolManager.Prewarm(LevelDataSO, GameConfigSO)`
 - [ ] **P1-17** Implement `GridManager.SpawnGrid(LevelDataSO)` — world positioning từ `GridOrigin` + `CellSpacing`

@@ -2,7 +2,8 @@
     "name": "PixelFlowClone.Editor",
     "rootNamespace": "PixelFlowClone.Editor",
     "references": [
-        "PixelFlowClone.Runtime"
+        "PixelFlowClone.Runtime",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Editor"
