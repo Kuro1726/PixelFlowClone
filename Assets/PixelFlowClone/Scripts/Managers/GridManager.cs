@@ -8,7 +8,7 @@ namespace PixelFlowClone.Managers
 {
     /// <summary>
     /// Spawns and tracks the central pixel-block grid from a LevelDataSO.
-    /// Scene-scoped (not DontDestroyOnLoad). Block release / RemainingBlocks land in P1-18/P1-19.
+    /// Scene-scoped (not DontDestroyOnLoad). RemainingBlocks lands in P1-19.
     /// </summary>
     public class GridManager : Singleton<GridManager>
     {
@@ -77,6 +77,28 @@ namespace PixelFlowClone.Managers
             }
 
             _blocks.Clear();
+        }
+
+        /// <summary>
+        /// Consumes the block at <paramref name="gridPosition"/> when its color matches.
+        /// Returns false if no block exists, colors differ, or the block was already consumed.
+        /// </summary>
+        public bool TryConsumeBlock(ColorId color, Vector2Int gridPosition)
+        {
+            if (!_blocks.TryGetValue(gridPosition, out PixelBlock block) || block == null)
+                return false;
+
+            if (block.IsConsumed || block.Color != color)
+                return false;
+
+            block.Consume();
+            _blocks.Remove(gridPosition);
+
+            if (PoolManager.Instance != null)
+                PoolManager.Instance.ReleasePixelBlock(block);
+
+            GameEvents.RaiseBlockConsumed();
+            return true;
         }
 
         public static Vector3 GridToWorld(LevelDataSO level, Vector2Int gridPos)
