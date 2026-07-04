@@ -1021,8 +1021,8 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P1-16** Implement `PoolManager.Prewarm(LevelDataSO, GameConfigSO)`
 - [x] **P1-17** Implement `GridManager.SpawnGrid(LevelDataSO)` — world positioning từ `GridOrigin` + `CellSpacing`
 - [x] **P1-18** Implement `GridManager.TryConsumeBlock(ColorId, Vector2Int)` — release block về pool
-- [ ] **P1-19** Implement `GridManager.RemainingBlocks` property
-- [ ] **P1-20** Implement `ConveyorWaypoint.cs` với gizmo draw
+- [x] **P1-19** Implement `GridManager.RemainingBlocks` property
+- [x] **P1-20** Implement `ConveyorWaypoint.cs` với gizmo draw
 - [ ] **P1-21** Setup closed-loop waypoints trong `SCN_Gameplay` (≥8 điểm bao quanh grid)
 - [ ] **P1-22** Implement `ConveyorPathSO` ScriptableObject
 - [ ] **P1-23** Implement `ConveyorPathManager` — waypoint index, `ActiveCount`, entry waypoint

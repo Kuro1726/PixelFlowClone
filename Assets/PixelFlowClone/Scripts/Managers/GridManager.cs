@@ -8,7 +8,7 @@ namespace PixelFlowClone.Managers
 {
     /// <summary>
     /// Spawns and tracks the central pixel-block grid from a LevelDataSO.
-    /// Scene-scoped (not DontDestroyOnLoad). RemainingBlocks lands in P1-19.
+    /// Scene-scoped (not DontDestroyOnLoad).
     /// </summary>
     public class GridManager : Singleton<GridManager>
     {
@@ -18,6 +18,11 @@ namespace PixelFlowClone.Managers
         private LevelDataSO _currentLevel;
 
         public IReadOnlyDictionary<Vector2Int, PixelBlock> Blocks => _blocks;
+
+        /// <summary>
+        /// Number of unconsumed blocks still tracked on the grid. Used for win checks (== 0).
+        /// </summary>
+        public int RemainingBlocks => _blocks.Count;
 
         /// <summary>
         /// Instantiates one PixelBlock per non-empty cell, positioned in world space
