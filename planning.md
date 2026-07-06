@@ -1024,7 +1024,7 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P1-19** Implement `GridManager.RemainingBlocks` property
 - [x] **P1-20** Implement `ConveyorWaypoint.cs` với gizmo draw
 - [x] **P1-21** Setup closed-loop waypoints trong `SCN_Gameplay` (≥8 điểm bao quanh grid)
-- [ ] **P1-22** Implement `ConveyorPathSO` ScriptableObject
+- [x] **P1-22** Implement `ConveyorPathSO` ScriptableObject
 - [ ] **P1-23** Implement `ConveyorPathManager` — waypoint index, `ActiveCount`, entry waypoint
 - [ ] **P1-24** Implement `CollectorState` enum và `CollectorStateMachine.cs`
 - [ ] **P1-25** Implement `CollectorUnit.TickMovement(float dt)` dùng `Rigidbody2D.MovePosition`
