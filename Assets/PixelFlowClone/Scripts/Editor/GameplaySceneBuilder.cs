@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using PixelFlowClone.Conveyor;
 using PixelFlowClone.Data;
+using PixelFlowClone.Managers;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -16,6 +17,7 @@ namespace PixelFlowClone.Editor
     {
         private const string ScenePath = "Assets/PixelFlowClone/Scenes/SCN_Gameplay.unity";
         private const string LevelPath = "Assets/PixelFlowClone/ScriptableObjects/Levels/Level_001.asset";
+        private const string ConfigPath = "Assets/PixelFlowClone/ScriptableObjects/Config/GameConfig.asset";
         private const float PathMargin = 1.5f;
 
         [MenuItem("PixelFlowClone/Build Gameplay Scene")]
@@ -43,7 +45,8 @@ namespace PixelFlowClone.Editor
 
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
             ConfigureCamera();
-            BuildConveyorPath(level);
+            Transform pathRoot = BuildConveyorPath(level);
+            WireConveyorPathManager(pathRoot, level);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.Refresh();
@@ -69,7 +72,7 @@ namespace PixelFlowClone.Editor
             camera.clearFlags = CameraClearFlags.SolidColor;
         }
 
-        private static void BuildConveyorPath(LevelDataSO level)
+        private static Transform BuildConveyorPath(LevelDataSO level)
         {
             IReadOnlyList<Vector2> positions = ComputeLoopPositions(level);
 
@@ -85,6 +88,21 @@ namespace PixelFlowClone.Editor
                 so.FindProperty("_index").intValue = i;
                 so.ApplyModifiedPropertiesWithoutUndo();
             }
+
+            return pathRoot.transform;
+        }
+
+        private static void WireConveyorPathManager(Transform pathRoot, LevelDataSO level)
+        {
+            var config = AssetDatabase.LoadAssetAtPath<GameConfigSO>(ConfigPath);
+            var systems = new GameObject("GameplaySystems");
+            var manager = systems.AddComponent<ConveyorPathManager>();
+
+            var so = new SerializedObject(manager);
+            so.FindProperty("_pathRoot").objectReferenceValue = pathRoot;
+            so.FindProperty("_pathData").objectReferenceValue = level.PathReference;
+            so.FindProperty("_config").objectReferenceValue = config;
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         /// <summary>
