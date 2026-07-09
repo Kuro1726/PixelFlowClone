@@ -10,7 +10,7 @@ namespace PixelFlowClone.Managers
 {
     /// <summary>
     /// Scene-scoped manager for the closed conveyor loop: waypoint graph, capacity,
-    /// and unit registration. Movement tick arrives in P1-25; lap detection in P1-26.
+    /// and unit registration. Lap detection arrives in P1-26.
     /// </summary>
     public class ConveyorPathManager : Singleton<ConveyorPathManager>
     {
@@ -36,6 +36,8 @@ namespace PixelFlowClone.Managers
         public float MoveSpeed => _pathData != null && _config != null
             ? _pathData.ResolveMoveSpeed(_config)
             : _config != null ? _config.CollectorMoveSpeed : 3f;
+
+        public float WaypointReachEpsilon => _config != null ? _config.LapCompleteEpsilon : 0.05f;
 
         protected override void OnSingletonAwake()
         {
@@ -115,7 +117,7 @@ namespace PixelFlowClone.Managers
                 return false;
             }
 
-            RegisterUnit(unit, _entryListIndex);
+            RegisterUnit(unit, GetInitialMovementIndex());
 
             ConveyorWaypoint entry = GetEntryWaypoint();
             if (entry != null)
@@ -124,7 +126,39 @@ namespace PixelFlowClone.Managers
                 unit.transform.position = new Vector3(entryPos.x, entryPos.y, unit.transform.position.z);
             }
 
+            unit.TrySetState(CollectorState.OnConveyor);
             return true;
+        }
+
+        private int GetInitialMovementIndex()
+        {
+            if (_waypoints.Count == 0)
+                return 0;
+
+            return (_entryListIndex + 1) % _waypoints.Count;
+        }
+
+        private void FixedUpdate()
+        {
+            if (_waypoints.Count == 0 || _activeUnits.Count == 0)
+                return;
+
+            float deltaTime = Time.fixedDeltaTime;
+            float speed = MoveSpeed;
+            float reachEpsilon = WaypointReachEpsilon;
+
+            for (int i = 0; i < _activeUnits.Count; i++)
+            {
+                CollectorUnit unit = _activeUnits[i];
+                if (unit == null || unit.State != CollectorState.OnConveyor)
+                    continue;
+
+                if (!_unitWaypointIndices.TryGetValue(unit, out int waypointIndex))
+                    continue;
+
+                unit.TickMovement(deltaTime, _waypoints, ref waypointIndex, speed, reachEpsilon);
+                _unitWaypointIndices[unit] = waypointIndex;
+            }
         }
 
         public void RegisterUnit(CollectorUnit unit)

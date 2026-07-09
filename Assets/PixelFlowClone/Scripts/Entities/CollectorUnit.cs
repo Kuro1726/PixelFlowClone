@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using PixelFlowClone.Conveyor;
 using PixelFlowClone.Data;
 using TMPro;
 using UnityEngine;
@@ -23,6 +25,9 @@ namespace PixelFlowClone.Entities
         public CollectorState State => _stateMachine.CurrentState;
 
         public Rigidbody2D Body => _rigidbody;
+
+        /// <summary>Normalized direction of the current movement segment (for perpendicular raycast in P1-27).</summary>
+        public Vector2 CurrentMoveDirection { get; private set; } = Vector2.right;
 
         public bool TrySetState(CollectorState target) => _stateMachine.TryTransition(target);
 
@@ -60,13 +65,72 @@ namespace PixelFlowClone.Entities
 
         public void OnSpawnFromPool()
         {
-            // Reserved for re-enabling colliders / VFX when pulled from the pool.
+            CurrentMoveDirection = Vector2.right;
+        }
+
+        /// <summary>
+        /// Moves toward <paramref name="waypointListIndex"/> along the conveyor loop using kinematic physics.
+        /// Returns true when the target waypoint was reached and the index advanced to the next segment.
+        /// </summary>
+        public bool TickMovement(
+            float deltaTime,
+            IReadOnlyList<ConveyorWaypoint> waypoints,
+            ref int waypointListIndex,
+            float speed,
+            float reachEpsilon)
+        {
+            if (State != CollectorState.OnConveyor || _rigidbody == null)
+                return false;
+
+            if (waypoints == null || waypoints.Count == 0)
+                return false;
+
+            waypointListIndex = Mathf.Clamp(waypointListIndex, 0, waypoints.Count - 1);
+            Vector2 target = waypoints[waypointListIndex].Position;
+            Vector2 pos = _rigidbody.position;
+            Vector2 toTarget = target - pos;
+            float distance = toTarget.magnitude;
+
+            if (distance <= reachEpsilon)
+            {
+                _rigidbody.MovePosition(target);
+                CurrentMoveDirection = GetSegmentDirection(waypoints, waypointListIndex);
+                AdvanceWaypointIndex(ref waypointListIndex, waypoints.Count);
+                return true;
+            }
+
+            Vector2 dir = toTarget / distance;
+            CurrentMoveDirection = dir;
+            float step = speed * deltaTime;
+
+            if (distance <= step)
+            {
+                _rigidbody.MovePosition(target);
+                AdvanceWaypointIndex(ref waypointListIndex, waypoints.Count);
+                return true;
+            }
+
+            _rigidbody.MovePosition(pos + dir * step);
+            return false;
+        }
+
+        private static Vector2 GetSegmentDirection(IReadOnlyList<ConveyorWaypoint> waypoints, int listIndex)
+        {
+            int nextIndex = (listIndex + 1) % waypoints.Count;
+            Vector2 delta = waypoints[nextIndex].Position - waypoints[listIndex].Position;
+            return delta.sqrMagnitude > 0.0001f ? delta.normalized : Vector2.right;
+        }
+
+        private static void AdvanceWaypointIndex(ref int waypointListIndex, int waypointCount)
+        {
+            waypointListIndex = (waypointListIndex + 1) % waypointCount;
         }
 
         public void ResetFromPool()
         {
             Color = ColorId.None;
             Capacity = 0;
+            CurrentMoveDirection = Vector2.right;
             _stateMachine.ResetTo(CollectorState.Pooled);
             if (_capacityLabel != null) _capacityLabel.text = string.Empty;
         }
