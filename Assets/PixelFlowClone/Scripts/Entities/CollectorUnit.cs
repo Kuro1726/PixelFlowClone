@@ -6,7 +6,7 @@ namespace PixelFlowClone.Entities
 {
     /// <summary>
     /// Collector entity that travels the conveyor and consumes matching blocks.
-    /// Movement / FSM / raycast wiring arrives in later Phase 1 tasks (P1-24+).
+    /// Movement / raycast wiring arrives in P1-25+.
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D))]
     [RequireComponent(typeof(SpriteRenderer))]
@@ -16,10 +16,17 @@ namespace PixelFlowClone.Entities
         [SerializeField] private SpriteRenderer _spriteRenderer;
         [SerializeField] private TMP_Text _capacityLabel;
 
+        private readonly CollectorStateMachine _stateMachine = new();
+
         public ColorId Color { get; private set; }
         public int Capacity { get; private set; }
+        public CollectorState State => _stateMachine.CurrentState;
 
         public Rigidbody2D Body => _rigidbody;
+
+        public bool TrySetState(CollectorState target) => _stateMachine.TryTransition(target);
+
+        public void ForceState(CollectorState state) => _stateMachine.ResetTo(state);
 
         private void Reset()
         {
@@ -60,6 +67,7 @@ namespace PixelFlowClone.Entities
         {
             Color = ColorId.None;
             Capacity = 0;
+            _stateMachine.ResetTo(CollectorState.Pooled);
             if (_capacityLabel != null) _capacityLabel.text = string.Empty;
         }
 
