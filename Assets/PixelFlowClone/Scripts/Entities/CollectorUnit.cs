@@ -126,6 +126,15 @@ namespace PixelFlowClone.Entities
             waypointListIndex = (waypointListIndex + 1) % waypointCount;
         }
 
+        /// <summary>
+        /// Called when the unit completes one full conveyor loop and returns to the entry waypoint.
+        /// Queue / exit branching is handled in Phase 2.
+        /// </summary>
+        public void OnLapComplete()
+        {
+            // Phase 2: if Capacity == 0 → Exiting; else → InQueueSlot via QueueManager.
+        }
+
         public void ResetFromPool()
         {
             Color = ColorId.None;

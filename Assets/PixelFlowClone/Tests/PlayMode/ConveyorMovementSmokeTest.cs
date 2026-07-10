@@ -17,5 +17,7 @@ public class ConveyorMovementSmokeTest : MonoBehaviour
         // 3. Đẩy lên băng chuyền
         bool ok = ConveyorPathManager.Instance.DispatchToConveyor(unit);
         Debug.Log($"DispatchToConveyor: {ok}");
+
+        GameEvents.OnCollectorLapComplete += u => Debug.Log($"Lap complete: {u.Color}, cap={u.Capacity}");
     }
 }

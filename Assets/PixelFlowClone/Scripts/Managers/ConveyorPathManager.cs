@@ -10,7 +10,7 @@ namespace PixelFlowClone.Managers
 {
     /// <summary>
     /// Scene-scoped manager for the closed conveyor loop: waypoint graph, capacity,
-    /// and unit registration. Lap detection arrives in P1-26.
+    /// and unit registration. Fires lap-complete when a unit returns to the entry waypoint.
     /// </summary>
     public class ConveyorPathManager : Singleton<ConveyorPathManager>
     {
@@ -22,6 +22,7 @@ namespace PixelFlowClone.Managers
         private readonly List<ConveyorWaypoint> _waypoints = new();
         private readonly List<CollectorUnit> _activeUnits = new();
         private readonly Dictionary<CollectorUnit, int> _unitWaypointIndices = new();
+        private readonly Dictionary<CollectorUnit, bool> _hasLeftEntrySinceDispatch = new();
 
         private int _entryListIndex;
 
@@ -127,6 +128,7 @@ namespace PixelFlowClone.Managers
             }
 
             unit.TrySetState(CollectorState.OnConveyor);
+            _hasLeftEntrySinceDispatch[unit] = false;
             return true;
         }
 
@@ -156,9 +158,25 @@ namespace PixelFlowClone.Managers
                 if (!_unitWaypointIndices.TryGetValue(unit, out int waypointIndex))
                     continue;
 
-                unit.TickMovement(deltaTime, _waypoints, ref waypointIndex, speed, reachEpsilon);
+                int previousIndex = waypointIndex;
+                bool reachedWaypoint = unit.TickMovement(
+                    deltaTime, _waypoints, ref waypointIndex, speed, reachEpsilon);
                 _unitWaypointIndices[unit] = waypointIndex;
+
+                if (!reachedWaypoint)
+                    continue;
+
+                if (previousIndex != _entryListIndex)
+                    _hasLeftEntrySinceDispatch[unit] = true;
+                else if (_hasLeftEntrySinceDispatch.TryGetValue(unit, out bool hasLeftEntry) && hasLeftEntry)
+                    HandleLapComplete(unit);
             }
+        }
+
+        private void HandleLapComplete(CollectorUnit unit)
+        {
+            unit.OnLapComplete();
+            GameEvents.RaiseCollectorLapComplete(unit);
         }
 
         public void RegisterUnit(CollectorUnit unit)
@@ -173,6 +191,7 @@ namespace PixelFlowClone.Managers
 
             _activeUnits.Add(unit);
             _unitWaypointIndices[unit] = Mathf.Clamp(waypointListIndex, 0, Mathf.Max(0, _waypoints.Count - 1));
+            _hasLeftEntrySinceDispatch.TryAdd(unit, false);
             NotifyConveyorCountChanged();
         }
 
@@ -185,6 +204,7 @@ namespace PixelFlowClone.Managers
                 return;
 
             _unitWaypointIndices.Remove(unit);
+            _hasLeftEntrySinceDispatch.Remove(unit);
             NotifyConveyorCountChanged();
         }
 
