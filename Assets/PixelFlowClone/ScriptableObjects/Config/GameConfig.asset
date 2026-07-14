@@ -16,11 +16,12 @@ MonoBehaviour:
   MaxQueueSlots: 5
   CollectorMoveSpeed: 3
   LapCompleteEpsilon: 0.05
-  RaycastDistance: 2
+  RaycastDistance: 20
   PixelBlockLayer:
     serializedVersion: 2
     m_Bits: 64
   RaycastSide: 0
+  ConsumeCooldownSeconds: 0.35
   TapCooldownSeconds: 0.15
   CollectorPoolPrewarm: 20
   BlockPoolPrewarm: 100

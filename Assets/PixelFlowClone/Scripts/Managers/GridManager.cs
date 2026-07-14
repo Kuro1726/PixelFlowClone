@@ -76,6 +76,7 @@ namespace PixelFlowClone.Managers
                     Vector3 worldPos = GridToWorld(level, gridPos);
 
                     PixelBlock block = PoolManager.Instance.GetPixelBlock();
+                    block.name = $"PixelBlock_{x}_{y}_i{y * level.GridSize.x + x}_{color}";
                     block.transform.SetParent(_gridRoot, false);
                     block.Initialize(color, gridPos, worldPos);
 

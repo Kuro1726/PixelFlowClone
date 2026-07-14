@@ -24,6 +24,7 @@ namespace PixelFlowClone.Entities
         private readonly CollectorStateMachine _stateMachine = new();
         private Coroutine _exitRoutine;
         private Vector3 _defaultScale = Vector3.one;
+        private float _nextConsumeTime;
 
         public ColorId Color { get; private set; }
         public int Capacity { get; private set; }
@@ -56,7 +57,28 @@ namespace PixelFlowClone.Entities
             if (State != CollectorState.OnConveyor)
                 return;
 
+            DrawPerpendicularRayPreview();
             TryConsumeBlocks();
+        }
+
+        /// <summary>
+        /// Keeps Debug.DrawRay visible every FixedUpdate while on the conveyor (P1-31).
+        /// </summary>
+        private void DrawPerpendicularRayPreview()
+        {
+            if (!ConveyorPathManager.HasInstance)
+                return;
+
+            GameConfigSO config = ConveyorPathManager.Instance.Config;
+            if (config == null)
+                return;
+
+            Vector2 origin = _rigidbody != null ? _rigidbody.position : (Vector2)transform.position;
+            Vector2 gridCenter = GridManager.HasInstance
+                ? GridManager.Instance.GridCenterWorld
+                : Vector2.zero;
+
+            PerpendicularRaycastSensor.DrawDebugRayPreview(origin, CurrentMoveDirection, config, gridCenter);
         }
 
         /// <summary>
@@ -69,6 +91,37 @@ namespace PixelFlowClone.Entities
 
             if (_spriteRenderer != null) _spriteRenderer.color = ColorPalette.ToColor(color);
             RefreshCapacityLabel();
+            _nextConsumeTime = 0f;
+        }
+
+        /// <summary>
+        /// Sets both Transform and Rigidbody2D position. Required for kinematic bodies —
+        /// assigning transform alone leaves Rigidbody2D.position stale (pool/default),
+        /// so raycasts would still fire from the old spot (often near the grid center).
+        /// </summary>
+        public void SetWorldPosition(Vector2 worldPos)
+        {
+            transform.position = new Vector3(worldPos.x, worldPos.y, transform.position.z);
+            if (_rigidbody == null)
+                _rigidbody = GetComponent<Rigidbody2D>();
+
+            if (_rigidbody != null)
+            {
+                _rigidbody.position = worldPos;
+                _rigidbody.velocity = Vector2.zero;
+            }
+        }
+
+        public void SetMoveDirection(Vector2 direction)
+        {
+            CurrentMoveDirection = direction.sqrMagnitude > 0.0001f
+                ? direction.normalized
+                : Vector2.right;
+        }
+
+        public void SuppressConsumeFor(float seconds)
+        {
+            _nextConsumeTime = Time.time + Mathf.Max(0f, seconds);
         }
 
         public void SetCapacity(int capacity)
@@ -85,6 +138,7 @@ namespace PixelFlowClone.Entities
             CurrentMoveDirection = Vector2.right;
             transform.localScale = _defaultScale;
             _exitRoutine = null;
+            _nextConsumeTime = 0f;
         }
 
         /// <summary>
@@ -153,6 +207,9 @@ namespace PixelFlowClone.Entities
             if (State != CollectorState.OnConveyor || Capacity <= 0)
                 return;
 
+            if (Time.time < _nextConsumeTime)
+                return;
+
             if (!ConveyorPathManager.HasInstance || !GridManager.HasInstance)
                 return;
 
@@ -177,6 +234,9 @@ namespace PixelFlowClone.Entities
 
             Capacity = Mathf.Max(0, Capacity - 1);
             RefreshCapacityLabel();
+
+            float cooldown = Mathf.Max(0f, config.ConsumeCooldownSeconds);
+            _nextConsumeTime = Time.time + cooldown;
 
             if (Capacity == 0)
                 BeginExit();
@@ -276,6 +336,7 @@ namespace PixelFlowClone.Entities
             Capacity = 0;
             CurrentMoveDirection = Vector2.right;
             transform.localScale = _defaultScale;
+            _nextConsumeTime = 0f;
             _stateMachine.ResetTo(CollectorState.Pooled);
             if (_capacityLabel != null) _capacityLabel.text = string.Empty;
         }

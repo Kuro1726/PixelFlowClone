@@ -50,35 +50,82 @@ namespace PixelFlowClone.Conveyor
                 ? config.PixelBlockLayer.value
                 : PhysicsLayers.GetLayerMask(PhysicsLayers.PixelBlock);
 
-            int hitCount = Physics2D.RaycastNonAlloc(
-                origin,
-                perpendicular,
-                Hits,
-                config.RaycastDistance,
-                mask);
+            float distance = config.RaycastDistance;
+            // Return all hits along the ray (sorted by distance). Buffer sized for dense grids.
+            int hitCount = Physics2D.RaycastNonAlloc(origin, perpendicular, Hits, distance, mask);
 
-#if UNITY_EDITOR
-            Debug.DrawRay(origin, perpendicular * config.RaycastDistance, Color.yellow, 0.1f);
-#endif
+            bool matched = false;
+            bool blockedByOtherColor = false;
 
-            for (int i = 0; i < hitCount; i++)
+            // Only the nearest collider counts: wrong color = blocked (cannot dig through Blue to Red).
+            if (hitCount > 0 && Hits[0].collider != null)
             {
-                Collider2D collider = Hits[i].collider;
-                if (collider == null)
-                    continue;
-
-                PixelBlock block = collider.GetComponent<PixelBlock>();
-                if (block == null || block.IsConsumed)
-                    continue;
-
-                if (block.Color != collectorColor)
-                    continue;
-
-                hitBlock = block;
-                return true;
+                PixelBlock nearest = Hits[0].collider.GetComponent<PixelBlock>();
+                if (nearest != null && !nearest.IsConsumed)
+                {
+                    if (nearest.Color == collectorColor)
+                    {
+                        hitBlock = nearest;
+                        matched = true;
+                    }
+                    else
+                    {
+                        blockedByOtherColor = true;
+                    }
+                }
             }
 
-            return false;
+            DrawDebugRay(origin, perpendicular, distance, matched, hitCount > 0, blockedByOtherColor);
+            return matched;
+        }
+
+        /// <summary>
+        /// Draws the current perpendicular ray in the Scene view (Play Mode).
+        /// Yellow = miss, cyan = blocked by other color, green = matching consumable.
+        /// </summary>
+        public static void DrawDebugRay(
+            Vector2 origin,
+            Vector2 perpendicularDirection,
+            float distance,
+            bool matchedConsumable,
+            bool anyPhysicsHit,
+            bool blockedByOtherColor = false)
+        {
+#if UNITY_EDITOR
+            if (perpendicularDirection.sqrMagnitude < 0.001f || distance <= 0f)
+                return;
+
+            Color color = matchedConsumable
+                ? Color.green
+                : blockedByOtherColor
+                    ? Color.magenta
+                    : anyPhysicsHit
+                        ? Color.cyan
+                        : Color.yellow;
+
+            Debug.DrawRay(origin, perpendicularDirection.normalized * distance, color, 0f, false);
+#endif
+        }
+
+        /// <summary>
+        /// Debug-only draw without consuming. Call from OnConveyor FixedUpdate so the ray stays visible.
+        /// </summary>
+        public static void DrawDebugRayPreview(
+            Vector2 origin,
+            Vector2 moveDirection,
+            GameConfigSO config,
+            Vector2 gridCenter)
+        {
+#if UNITY_EDITOR
+            if (config == null || moveDirection.sqrMagnitude < 0.001f)
+                return;
+
+            Vector2 perpendicular = ComputePerpendicular(moveDirection.normalized, config.RaycastSide, origin, gridCenter);
+            if (perpendicular.sqrMagnitude < 0.001f)
+                return;
+
+            DrawDebugRay(origin, perpendicular.normalized, config.RaycastDistance, matchedConsumable: false, anyPhysicsHit: false);
+#endif
         }
 
         public static Vector2 ComputePerpendicular(

@@ -126,8 +126,18 @@ namespace PixelFlowClone.Managers
             if (entry != null)
             {
                 Vector2 entryPos = entry.Position;
-                unit.transform.position = new Vector3(entryPos.x, entryPos.y, unit.transform.position.z);
+                unit.SetWorldPosition(entryPos);
+
+                ConveyorWaypoint next = GetWaypointAtListIndex(GetInitialMovementIndex());
+                if (next != null)
+                    unit.SetMoveDirection(next.Position - entryPos);
             }
+
+            // Prevent same-frame FixedUpdate from consuming with stale physics state.
+            Physics2D.SyncTransforms();
+
+            // One physics step of grace so FixedUpdate never consumes with a stale body pose.
+            unit.SuppressConsumeFor(Time.fixedDeltaTime * 2f);
 
             unit.TrySetState(CollectorState.OnConveyor);
             _hasLeftEntrySinceDispatch[unit] = false;

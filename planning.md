@@ -829,7 +829,7 @@ public static class DeadlockDetector
 **Tiêu chí hoàn thành Phase 1:**
 - [ ] Play Mode: 1 level load từ `Level_001.asset`, 1 collector có thể chạy 1 vòng và ăn ít nhất 1 block đúng màu.
 - [ ] Không có `Destroy()` runtime trên block/collector.
-- [ ] `Debug.DrawRay` hiển thị hướng raycast vuông góc trong Scene view.
+- [x] `Debug.DrawRay` hiển thị hướng raycast vuông góc trong Scene view.
 
 | # | Task | Kết quả mong đợi | Ghi chú kỹ thuật |
 |---|------|------------------|------------------|
@@ -1033,7 +1033,7 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P1-28** Wire consume trong `CollectorUnit.FixedUpdate` khi state `OnConveyor`
 - [x] **P1-29** Implement capacity decrement và transition `Exiting` khi capacity == 0
 - [x] **P1-30** Implement exit animation stub + `PoolManager.ReleaseCollector(unit)`
-- [ ] **P1-31** Verify `Debug.DrawRay` hiển thị tia vuông góc trong Scene view
+- [x] **P1-31** Verify `Debug.DrawRay` hiển thị tia vuông góc trong Scene view
 
 ### Phase 2: Queue Management & Game Loop
 

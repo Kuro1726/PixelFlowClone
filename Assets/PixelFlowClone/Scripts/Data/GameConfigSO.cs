@@ -14,9 +14,11 @@ namespace PixelFlowClone.Data
         public float LapCompleteEpsilon = 0.05f;
 
         [Header("Raycast Consume")]
-        public float RaycastDistance = 2f;
+        public float RaycastDistance = 20f;
         public LayerMask PixelBlockLayer;
         public PerpendicularSide RaycastSide = PerpendicularSide.Inward;
+        [Tooltip("Minimum seconds between two successful block consumes on the same collector.")]
+        public float ConsumeCooldownSeconds = 0.35f;
 
         [Header("Input")]
         public float TapCooldownSeconds = 0.15f;
