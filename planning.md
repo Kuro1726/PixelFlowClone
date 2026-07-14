@@ -1029,7 +1029,7 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P1-24** Implement `CollectorState` enum và `CollectorStateMachine.cs`
 - [x] **P1-25** Implement `CollectorUnit.TickMovement(float dt)` dùng `Rigidbody2D.MovePosition`
 - [x] **P1-26** Implement lap complete detection (`LapCompleteEpsilon`) + callback `OnLapComplete`
-- [ ] **P1-27** Implement `PerpendicularRaycastSensor.TryDetectConsumable(...)` với `Physics2D.Raycast`
+- [x] **P1-27** Implement `PerpendicularRaycastSensor.TryDetectConsumable(...)` với `Physics2D.Raycast`
 - [ ] **P1-28** Wire consume trong `CollectorUnit.FixedUpdate` khi state `OnConveyor`
 - [ ] **P1-29** Implement capacity decrement và transition `Exiting` khi capacity == 0
 - [ ] **P1-30** Implement exit animation stub + `PoolManager.ReleaseCollector(unit)`
