@@ -1,5 +1,7 @@
+using System.Collections;
 using System.Collections.Generic;
 using PixelFlowClone.Conveyor;
+using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.Managers;
 using TMPro;
@@ -17,8 +19,11 @@ namespace PixelFlowClone.Entities
         [SerializeField] private Rigidbody2D _rigidbody;
         [SerializeField] private SpriteRenderer _spriteRenderer;
         [SerializeField] private TMP_Text _capacityLabel;
+        [SerializeField] private float _exitDuration = 0.25f;
 
         private readonly CollectorStateMachine _stateMachine = new();
+        private Coroutine _exitRoutine;
+        private Vector3 _defaultScale = Vector3.one;
 
         public ColorId Color { get; private set; }
         public int Capacity { get; private set; }
@@ -43,6 +48,7 @@ namespace PixelFlowClone.Entities
         {
             if (_rigidbody == null) _rigidbody = GetComponent<Rigidbody2D>();
             if (_spriteRenderer == null) _spriteRenderer = GetComponent<SpriteRenderer>();
+            _defaultScale = transform.localScale;
         }
 
         private void FixedUpdate()
@@ -77,6 +83,8 @@ namespace PixelFlowClone.Entities
         public void OnSpawnFromPool()
         {
             CurrentMoveDirection = Vector2.right;
+            transform.localScale = _defaultScale;
+            _exitRoutine = null;
         }
 
         /// <summary>
@@ -186,8 +194,7 @@ namespace PixelFlowClone.Entities
         }
 
         /// <summary>
-        /// Transitions OnConveyor → Exiting, leaves the conveyor roster, and stops consume/move.
-        /// Pool release / exit VFX is completed in P1-30.
+        /// Transitions OnConveyor → Exiting, leaves the conveyor roster, plays exit stub, then pool-releases.
         /// </summary>
         public bool BeginExit()
         {
@@ -201,7 +208,6 @@ namespace PixelFlowClone.Entities
             }
             else if (State == CollectorState.InQueueSlot || State == CollectorState.InWaitingStack)
             {
-                // Lap-end or edge paths: force into Exiting when capacity already zero.
                 ForceState(CollectorState.Exiting);
             }
             else
@@ -214,14 +220,62 @@ namespace PixelFlowClone.Entities
 
             Capacity = 0;
             RefreshCapacityLabel();
+
+            if (_exitRoutine != null)
+                StopCoroutine(_exitRoutine);
+
+            _exitRoutine = StartCoroutine(ExitSequence());
             return true;
+        }
+
+        /// <summary>
+        /// Stub exit animation (scale down). Phase 3 replaces with full tween / fly-off VFX.
+        /// </summary>
+        private IEnumerator ExitSequence()
+        {
+            Vector3 startScale = transform.localScale;
+            float elapsed = 0f;
+            float duration = Mathf.Max(0.01f, _exitDuration);
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                transform.localScale = Vector3.Lerp(startScale, Vector3.zero, t);
+                yield return null;
+            }
+
+            transform.localScale = Vector3.zero;
+            CompleteExitAndRelease();
+        }
+
+        private void CompleteExitAndRelease()
+        {
+            _exitRoutine = null;
+
+            if (!TrySetState(CollectorState.Pooled))
+                ForceState(CollectorState.Pooled);
+
+            GameEvents.RaiseCollectorExited(this);
+
+            if (PoolManager.HasInstance)
+                PoolManager.Instance.ReleaseCollector(this);
+            else
+                gameObject.SetActive(false);
         }
 
         public void ResetFromPool()
         {
+            if (_exitRoutine != null)
+            {
+                StopCoroutine(_exitRoutine);
+                _exitRoutine = null;
+            }
+
             Color = ColorId.None;
             Capacity = 0;
             CurrentMoveDirection = Vector2.right;
+            transform.localScale = _defaultScale;
             _stateMachine.ResetTo(CollectorState.Pooled);
             if (_capacityLabel != null) _capacityLabel.text = string.Empty;
         }

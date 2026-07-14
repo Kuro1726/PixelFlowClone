@@ -1032,7 +1032,7 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P1-27** Implement `PerpendicularRaycastSensor.TryDetectConsumable(...)` với `Physics2D.Raycast`
 - [x] **P1-28** Wire consume trong `CollectorUnit.FixedUpdate` khi state `OnConveyor`
 - [x] **P1-29** Implement capacity decrement và transition `Exiting` khi capacity == 0
-- [ ] **P1-30** Implement exit animation stub + `PoolManager.ReleaseCollector(unit)`
+- [x] **P1-30** Implement exit animation stub + `PoolManager.ReleaseCollector(unit)`
 - [ ] **P1-31** Verify `Debug.DrawRay` hiển thị tia vuông góc trong Scene view
 
 ### Phase 2: Queue Management & Game Loop
