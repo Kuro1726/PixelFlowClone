@@ -67,8 +67,11 @@ namespace PixelFlowClone.Entities
 
         public void SetCapacity(int capacity)
         {
-            Capacity = capacity;
+            Capacity = Mathf.Max(0, capacity);
             RefreshCapacityLabel();
+
+            if (Capacity == 0 && State == CollectorState.OnConveyor)
+                BeginExit();
         }
 
         public void OnSpawnFromPool()
@@ -164,19 +167,54 @@ namespace PixelFlowClone.Entities
             if (!GridManager.Instance.TryConsumeBlock(Color, hitBlock.GridPosition))
                 return;
 
-            Capacity--;
+            Capacity = Mathf.Max(0, Capacity - 1);
             RefreshCapacityLabel();
 
-            // P1-29: transition to Exiting when Capacity == 0.
+            if (Capacity == 0)
+                BeginExit();
         }
 
         /// <summary>
         /// Called when the unit completes one full conveyor loop and returns to the entry waypoint.
-        /// Queue / exit branching is handled in Phase 2.
+        /// Capacity &gt; 0 → queue (Phase 2); Capacity == 0 → exit.
         /// </summary>
         public void OnLapComplete()
         {
-            // Phase 2: if Capacity == 0 → Exiting; else → InQueueSlot via QueueManager.
+            if (Capacity <= 0)
+                BeginExit();
+            // Phase 2: else → InQueueSlot via QueueManager.
+        }
+
+        /// <summary>
+        /// Transitions OnConveyor → Exiting, leaves the conveyor roster, and stops consume/move.
+        /// Pool release / exit VFX is completed in P1-30.
+        /// </summary>
+        public bool BeginExit()
+        {
+            if (State == CollectorState.Exiting || State == CollectorState.Pooled)
+                return false;
+
+            if (State == CollectorState.OnConveyor)
+            {
+                if (!TrySetState(CollectorState.Exiting))
+                    return false;
+            }
+            else if (State == CollectorState.InQueueSlot || State == CollectorState.InWaitingStack)
+            {
+                // Lap-end or edge paths: force into Exiting when capacity already zero.
+                ForceState(CollectorState.Exiting);
+            }
+            else
+            {
+                return false;
+            }
+
+            if (ConveyorPathManager.HasInstance)
+                ConveyorPathManager.Instance.UnregisterUnit(this);
+
+            Capacity = 0;
+            RefreshCapacityLabel();
+            return true;
         }
 
         public void ResetFromPool()
