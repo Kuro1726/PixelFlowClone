@@ -1037,9 +1037,9 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 
 ### Phase 2: Queue Management & Game Loop
 
-- [ ] **P2-01** Implement `ITappable` interface tại `Scripts/Queue/ITappable.cs`
-- [ ] **P2-02** Implement `CollectorUnit.OnTap()` theo state hiện tại
-- [ ] **P2-03** Implement `WaitingSlotController` — spawn collectors từ `LevelDataSO.WaitingQueue`
+- [x] **P2-01** Implement `ITappable` interface tại `Scripts/Queue/ITappable.cs`
+- [x] **P2-02** Implement `CollectorUnit.OnTap()` theo state hiện tại
+- [x] **P2-03** Implement `WaitingSlotController` — spawn collectors từ `LevelDataSO.WaitingQueue`
 - [ ] **P2-04** Implement `QueueSlotController` — 5 slot anchors, hiển thị unit
 - [ ] **P2-05** Implement `QueueManager.TryDispatchFromWaiting()` — chỉ front unit, chỉ lên conveyor
 - [ ] **P2-06** Guard `ConveyorPathManager.DispatchToConveyor`: return false nếu `ActiveCount >= MaxCapacity`

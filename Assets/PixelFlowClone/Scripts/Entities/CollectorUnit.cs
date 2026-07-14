@@ -4,6 +4,7 @@ using PixelFlowClone.Conveyor;
 using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.Managers;
+using PixelFlowClone.Queue;
 using TMPro;
 using UnityEngine;
 
@@ -14,7 +15,7 @@ namespace PixelFlowClone.Entities
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D))]
     [RequireComponent(typeof(SpriteRenderer))]
-    public class CollectorUnit : MonoBehaviour
+    public class CollectorUnit : MonoBehaviour, ITappable
     {
         [SerializeField] private Rigidbody2D _rigidbody;
         [SerializeField] private SpriteRenderer _spriteRenderer;
@@ -38,6 +39,45 @@ namespace PixelFlowClone.Entities
         public bool TrySetState(CollectorState target) => _stateMachine.TryTransition(target);
 
         public void ForceState(CollectorState state) => _stateMachine.ResetTo(state);
+
+        /// <summary>
+        /// Player tap. Waiting stack → direct to conveyor; queue slot → manual re-dispatch.
+        /// Front-of-stack / slot ownership are enforced by QueueManager (P2-05+).
+        /// </summary>
+        public void OnTap()
+        {
+            switch (State)
+            {
+                case CollectorState.InWaitingStack:
+                    TryDispatchToConveyorFromTap();
+                    break;
+                case CollectorState.InQueueSlot:
+                    TryDispatchToConveyorFromTap();
+                    break;
+                case CollectorState.OnConveyor:
+                case CollectorState.Exiting:
+                case CollectorState.Pooled:
+                default:
+                    // Not tappable in these states.
+                    break;
+            }
+        }
+
+        private void TryDispatchToConveyorFromTap()
+        {
+            if (!ConveyorPathManager.HasInstance)
+            {
+                Debug.LogWarning("[CollectorUnit] OnTap: ConveyorPathManager missing.");
+                return;
+            }
+
+            bool ok = ConveyorPathManager.Instance.DispatchToConveyor(this);
+            if (!ok)
+            {
+                // P3-19: shake + reject SFX when conveyor is full.
+                Debug.Log($"[CollectorUnit] OnTap rejected ({State}, conveyor full or already active).");
+            }
+        }
 
         private void Reset()
         {
