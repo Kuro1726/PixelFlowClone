@@ -30,6 +30,8 @@ namespace PixelFlowClone.Managers
 
         public int MaxCapacity => _config != null ? _config.MaxConveyorUnits : 5;
 
+        public GameConfigSO Config => _config;
+
         public IReadOnlyList<CollectorUnit> ActiveUnits => _activeUnits;
 
         public IReadOnlyList<ConveyorWaypoint> Waypoints => _waypoints;

@@ -25,6 +25,23 @@ namespace PixelFlowClone.Managers
         public int RemainingBlocks => _blocks.Count;
 
         /// <summary>
+        /// World-space center of the current level grid. Used by inward/outward raycasts.
+        /// </summary>
+        public Vector2 GridCenterWorld
+        {
+            get
+            {
+                if (_currentLevel == null)
+                    return Vector2.zero;
+
+                LevelDataSO level = _currentLevel;
+                float centerX = level.GridOrigin.x + (level.GridSize.x - 1) * level.CellSpacing.x * 0.5f;
+                float centerY = level.GridOrigin.y + (level.GridSize.y - 1) * level.CellSpacing.y * 0.5f;
+                return new Vector2(centerX, centerY);
+            }
+        }
+
+        /// <summary>
         /// Instantiates one PixelBlock per non-empty cell, positioned in world space
         /// using GridOrigin + (x * CellSpacing.x, y * CellSpacing.y).
         /// </summary>

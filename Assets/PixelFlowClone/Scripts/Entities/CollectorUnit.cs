@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using PixelFlowClone.Conveyor;
 using PixelFlowClone.Data;
+using PixelFlowClone.Managers;
 using TMPro;
 using UnityEngine;
 
@@ -8,7 +9,6 @@ namespace PixelFlowClone.Entities
 {
     /// <summary>
     /// Collector entity that travels the conveyor and consumes matching blocks.
-    /// Movement / raycast wiring arrives in P1-25+.
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D))]
     [RequireComponent(typeof(SpriteRenderer))]
@@ -26,7 +26,7 @@ namespace PixelFlowClone.Entities
 
         public Rigidbody2D Body => _rigidbody;
 
-        /// <summary>Normalized direction of the current movement segment (for perpendicular raycast in P1-27).</summary>
+        /// <summary>Normalized direction of the current movement segment (for perpendicular raycast).</summary>
         public Vector2 CurrentMoveDirection { get; private set; } = Vector2.right;
 
         public bool TrySetState(CollectorState target) => _stateMachine.TryTransition(target);
@@ -43,6 +43,14 @@ namespace PixelFlowClone.Entities
         {
             if (_rigidbody == null) _rigidbody = GetComponent<Rigidbody2D>();
             if (_spriteRenderer == null) _spriteRenderer = GetComponent<SpriteRenderer>();
+        }
+
+        private void FixedUpdate()
+        {
+            if (State != CollectorState.OnConveyor)
+                return;
+
+            TryConsumeBlocks();
         }
 
         /// <summary>
@@ -124,6 +132,42 @@ namespace PixelFlowClone.Entities
         private static void AdvanceWaypointIndex(ref int waypointListIndex, int waypointCount)
         {
             waypointListIndex = (waypointListIndex + 1) % waypointCount;
+        }
+
+        /// <summary>
+        /// Raycasts perpendicular to movement and consumes a matching block when hit.
+        /// </summary>
+        public void TryConsumeBlocks()
+        {
+            if (State != CollectorState.OnConveyor || Capacity <= 0)
+                return;
+
+            if (!ConveyorPathManager.HasInstance || !GridManager.HasInstance)
+                return;
+
+            GameConfigSO config = ConveyorPathManager.Instance.Config;
+            if (config == null)
+                return;
+
+            Vector2 origin = _rigidbody != null ? _rigidbody.position : (Vector2)transform.position;
+            Vector2 gridCenter = GridManager.Instance.GridCenterWorld;
+
+            if (!PerpendicularRaycastSensor.TryDetectConsumable(
+                    origin,
+                    CurrentMoveDirection,
+                    Color,
+                    config,
+                    gridCenter,
+                    out PixelBlock hitBlock))
+                return;
+
+            if (!GridManager.Instance.TryConsumeBlock(Color, hitBlock.GridPosition))
+                return;
+
+            Capacity--;
+            RefreshCapacityLabel();
+
+            // P1-29: transition to Exiting when Capacity == 0.
         }
 
         /// <summary>
