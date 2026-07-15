@@ -1040,8 +1040,8 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P2-01** Implement `ITappable` interface tại `Scripts/Queue/ITappable.cs`
 - [x] **P2-02** Implement `CollectorUnit.OnTap()` theo state hiện tại
 - [x] **P2-03** Implement `WaitingSlotController` — spawn collectors từ `LevelDataSO.WaitingQueue`
-- [ ] **P2-04** Implement `QueueSlotController` — 5 slot anchors, hiển thị unit
-- [ ] **P2-05** Implement `QueueManager.TryDispatchFromWaiting()` — chỉ front unit, chỉ lên conveyor
+- [x] **P2-04** Implement `QueueSlotController` — 5 slot anchors, hiển thị unit
+- [x] **P2-05** Implement `QueueManager.TryDispatchFromWaiting()` — chỉ front unit, chỉ lên conveyor
 - [ ] **P2-06** Guard `ConveyorPathManager.DispatchToConveyor`: return false nếu `ActiveCount >= MaxCapacity`
 - [ ] **P2-07** Implement reject feedback stub (log/SFX placeholder) khi conveyor full
 - [ ] **P2-08** Implement `QueueManager.TryEnqueueFromLap(CollectorUnit)` — auto assign slot trống

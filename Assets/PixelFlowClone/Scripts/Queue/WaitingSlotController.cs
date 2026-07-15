@@ -182,6 +182,22 @@ namespace PixelFlowClone.Queue
             }
         }
 
+        /// <summary>
+        /// Puts a unit back on the front of the waiting stack after a failed conveyor dispatch.
+        /// </summary>
+        public void RestoreFront(CollectorUnit unit)
+        {
+            if (unit == null || Contains(unit))
+                return;
+
+            EnsureStackRoot();
+            _stack.Add(unit);
+            unit.ForceState(CollectorState.InWaitingStack);
+            unit.transform.SetParent(_stackRoot, false);
+            RefreshLayout();
+            RefreshFrontTappable();
+        }
+
         private int DepthFromFront(int index) => _stack.Count - 1 - index;
 
         private void EnsureStackRoot()

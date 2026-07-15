@@ -46,10 +46,18 @@ namespace PixelFlowClone.Entities
         /// </summary>
         public void OnTap()
         {
+            Debug.Log($"[CollectorUnit] OnTap color={Color} capacity={Capacity} state={State}");
+
             switch (State)
             {
                 case CollectorState.InWaitingStack:
-                    TryDispatchToConveyorFromTap();
+                    if (QueueManager.HasInstance)
+                    {
+                        bool ok = QueueManager.Instance.TryDispatchFromWaiting(this);
+                        Debug.Log($"[CollectorUnit] Waiting dispatch via QueueManager → {(ok ? "OK" : "REJECTED")}");
+                    }
+                    else
+                        TryDispatchToConveyorFromTap();
                     break;
                 case CollectorState.InQueueSlot:
                     TryDispatchToConveyorFromTap();
@@ -58,7 +66,7 @@ namespace PixelFlowClone.Entities
                 case CollectorState.Exiting:
                 case CollectorState.Pooled:
                 default:
-                    // Not tappable in these states.
+                    Debug.Log($"[CollectorUnit] OnTap ignored in state {State}");
                     break;
             }
         }
