@@ -49,8 +49,11 @@ namespace PixelFlowClone.Managers
             if (_blockPoolRoot == null)
                 _blockPoolRoot = new GameObject("BlockPool").transform;
 
-            _collectorPoolRoot.SetParent(transform, false);
-            _blockPoolRoot.SetParent(transform, false);
+            // Keep world pose when parenting — scene-assigned roots often sit at a custom offset.
+            if (_collectorPoolRoot.parent != transform)
+                _collectorPoolRoot.SetParent(transform, true);
+            if (_blockPoolRoot.parent != transform)
+                _blockPoolRoot.SetParent(transform, true);
         }
 
         private void BuildPools()

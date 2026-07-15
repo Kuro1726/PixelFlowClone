@@ -32,12 +32,12 @@ namespace PixelFlowClone.Managers
             get
             {
                 if (_currentLevel == null)
-                    return Vector2.zero;
+                    return _gridRoot != null ? (Vector2)_gridRoot.position : Vector2.zero;
 
                 LevelDataSO level = _currentLevel;
-                float centerX = level.GridOrigin.x + (level.GridSize.x - 1) * level.CellSpacing.x * 0.5f;
-                float centerY = level.GridOrigin.y + (level.GridSize.y - 1) * level.CellSpacing.y * 0.5f;
-                return new Vector2(centerX, centerY);
+                float localX = level.GridOrigin.x + (level.GridSize.x - 1) * level.CellSpacing.x * 0.5f;
+                float localY = level.GridOrigin.y + (level.GridSize.y - 1) * level.CellSpacing.y * 0.5f;
+                return GridLocalToWorld(new Vector3(localX, localY, 0f));
             }
         }
 
@@ -77,7 +77,7 @@ namespace PixelFlowClone.Managers
 
                     PixelBlock block = PoolManager.Instance.GetPixelBlock();
                     block.name = $"PixelBlock_{x}_{y}_i{y * level.GridSize.x + x}_{color}";
-                    block.transform.SetParent(_gridRoot, false);
+                    block.transform.SetParent(_gridRoot, true);
                     block.Initialize(color, gridPos, worldPos);
 
                     _blocks[gridPos] = block;
@@ -124,11 +124,27 @@ namespace PixelFlowClone.Managers
             return true;
         }
 
-        public static Vector3 GridToWorld(LevelDataSO level, Vector2Int gridPos)
+        /// <summary>
+        /// GridOrigin + cell spacing are treated as local to <see cref="_gridRoot"/>.
+        /// Move GridRoot in the scene to shift the whole grid (e.g. match ConveyorPath Y).
+        /// </summary>
+        public Vector3 GridToWorld(LevelDataSO level, Vector2Int gridPos)
+        {
+            float localX = level.GridOrigin.x + gridPos.x * level.CellSpacing.x;
+            float localY = level.GridOrigin.y + gridPos.y * level.CellSpacing.y;
+            return GridLocalToWorld(new Vector3(localX, localY, 0f));
+        }
+
+        public static Vector3 GridToWorldStatic(LevelDataSO level, Vector2Int gridPos)
         {
             float worldX = level.GridOrigin.x + gridPos.x * level.CellSpacing.x;
             float worldY = level.GridOrigin.y + gridPos.y * level.CellSpacing.y;
             return new Vector3(worldX, worldY, 0f);
+        }
+
+        private Vector3 GridLocalToWorld(Vector3 local)
+        {
+            return _gridRoot != null ? _gridRoot.TransformPoint(local) : local;
         }
 
         private void EnsureGridRoot()
