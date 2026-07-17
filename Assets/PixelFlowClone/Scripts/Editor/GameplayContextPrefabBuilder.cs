@@ -10,6 +10,7 @@ namespace PixelFlowClone.Editor
 {
     /// <summary>
     /// Converts the gameplay systems hierarchy into PF_GameplayContext and wires its manager references.
+    /// GameManager / LevelManager stay as scene roots (DontDestroyOnLoad) — never nested under the prefab.
     /// </summary>
     public static class GameplayContextPrefabBuilder
     {
@@ -28,9 +29,7 @@ namespace PixelFlowClone.Editor
                     return;
 
                 GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
-                if (prefab != null &&
-                    prefab.GetComponentInChildren<GameManager>(true) != null &&
-                    prefab.GetComponentInChildren<LevelManager>(true) != null)
+                if (prefab != null && prefab.GetComponent<GameplayContext>() != null)
                     return;
 
                 if (SceneManager.GetActiveScene().path == ScenePath)
@@ -50,6 +49,8 @@ namespace PixelFlowClone.Editor
                 Debug.LogError("[PixelFlowClone] GameplaySystems root was not found.");
                 return;
             }
+
+            DetachPersistentManagersFromContext(root);
 
             GridManager grid = root.GetComponentInChildren<GridManager>(true);
             ConveyorPathManager conveyor = root.GetComponentInChildren<ConveyorPathManager>(true);
@@ -71,29 +72,7 @@ namespace PixelFlowClone.Editor
                 input = inputObject.AddComponent<InputManager>();
             }
 
-            GameManager game = root.GetComponentInChildren<GameManager>(true);
-            if (game == null)
-            {
-                var gameObject = new GameObject("GameManager");
-                gameObject.transform.SetParent(root.transform, false);
-                gameObject.AddComponent<GameManager>();
-            }
-
-            LevelManager levelManager = root.GetComponentInChildren<LevelManager>(true);
-            if (levelManager == null)
-            {
-                var levelObject = new GameObject("LevelManager");
-                levelObject.transform.SetParent(root.transform, false);
-                levelManager = levelObject.AddComponent<LevelManager>();
-            }
-
-            LevelDataSO defaultLevel = AssetDatabase.LoadAssetAtPath<LevelDataSO>(DefaultLevelPath);
-            var levelManagerObject = new SerializedObject(levelManager);
-            SerializedProperty levels = levelManagerObject.FindProperty("_levels");
-            levels.arraySize = defaultLevel != null ? 1 : 0;
-            if (defaultLevel != null)
-                levels.GetArrayElementAtIndex(0).objectReferenceValue = defaultLevel;
-            levelManagerObject.ApplyModifiedPropertiesWithoutUndo();
+            EnsureSceneRootPersistentManagers(scene);
 
             GameplayContext context = root.GetComponent<GameplayContext>();
             if (context == null)
@@ -123,6 +102,64 @@ namespace PixelFlowClone.Editor
         {
             BuildGameplayContextPrefab();
             EditorApplication.Exit(0);
+        }
+
+        private static void DetachPersistentManagersFromContext(GameObject root)
+        {
+            GameManager[] games = root.GetComponentsInChildren<GameManager>(true);
+            for (int i = 0; i < games.Length; i++)
+            {
+                if (games[i] != null)
+                    Object.DestroyImmediate(games[i].gameObject);
+            }
+
+            LevelManager[] levels = root.GetComponentsInChildren<LevelManager>(true);
+            for (int i = 0; i < levels.Length; i++)
+            {
+                if (levels[i] != null)
+                    Object.DestroyImmediate(levels[i].gameObject);
+            }
+        }
+
+        private static void EnsureSceneRootPersistentManagers(Scene scene)
+        {
+            LevelDataSO defaultLevel = AssetDatabase.LoadAssetAtPath<LevelDataSO>(DefaultLevelPath);
+
+            GameManager game = Object.FindFirstObjectByType<GameManager>();
+            if (game == null)
+            {
+                var go = new GameObject("GameManager");
+                SceneManager.MoveGameObjectToScene(go, scene);
+                go.AddComponent<GameManager>();
+            }
+            else if (game.transform.parent != null)
+            {
+                game.transform.SetParent(null, true);
+            }
+
+            LevelManager levelManager = Object.FindFirstObjectByType<LevelManager>();
+            if (levelManager == null)
+            {
+                var go = new GameObject("LevelManager");
+                SceneManager.MoveGameObjectToScene(go, scene);
+                levelManager = go.AddComponent<LevelManager>();
+            }
+            else if (levelManager.transform.parent != null)
+            {
+                levelManager.transform.SetParent(null, true);
+            }
+
+            var serialized = new SerializedObject(levelManager);
+            SerializedProperty levels = serialized.FindProperty("_levels");
+            if (levels.arraySize == 0 && defaultLevel != null)
+            {
+                levels.arraySize = 1;
+                levels.GetArrayElementAtIndex(0).objectReferenceValue = defaultLevel;
+            }
+
+            // SmokeTest owns initial spawn in SCN_Gameplay; avoid double LoadLevel on Start.
+            serialized.FindProperty("_loadSavedLevelOnStart").boolValue = false;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static GameObject FindRoot(Scene scene, string objectName)

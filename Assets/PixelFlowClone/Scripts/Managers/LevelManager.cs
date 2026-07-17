@@ -22,6 +22,11 @@ namespace PixelFlowClone.Managers
 
         public event Action<LevelDataSO, int> LevelLoaded;
 
+        public void ConfigureLevels(params LevelDataSO[] levels)
+        {
+            _levels = levels ?? Array.Empty<LevelDataSO>();
+        }
+
         protected override void OnSingletonAwake()
         {
             MakePersistent();

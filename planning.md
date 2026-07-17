@@ -1057,7 +1057,7 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P2-18** Implement `DeadlockDetector.IsDeadlocked(IDeadlockContext)` pure static *(optional; không dùng cho Defeat)*
 - [~] **P2-19** ~~Implement `CanCollectorReachBlock`~~ — cancelled (không còn lose theo reachability)
 - [x] **P2-20** Defeat khi lap enqueue Queue full (`TryEnqueueFromLap` → `DeclareDefeat`)
-- [ ] **P2-21** Wire `GameEvents.OnConveyorCountChanged` và `OnQueueCountChanged`
+- [x] **P2-21** Wire `GameEvents.OnConveyorCountChanged` và `OnQueueCountChanged`
 - [ ] **P2-22** Test thủ công scenario: tap waiting → conveyor, lap → queue, tap queue → conveyor
 - [ ] **P2-23** Test thủ công scenario: conveyor full + tap waiting → reject (không vào queue)
 

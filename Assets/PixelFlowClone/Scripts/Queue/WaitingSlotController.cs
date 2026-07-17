@@ -210,6 +210,7 @@ namespace PixelFlowClone.Queue
             Vector2 across = _columnDirection.sqrMagnitude > 0.0001f
                 ? _columnDirection.normalized
                 : Vector2.right;
+            float centerColumn = (_columns.Count - 1) * 0.5f;
 
             for (int c = 0; c < _columns.Count; c++)
             {
@@ -222,7 +223,10 @@ namespace PixelFlowClone.Queue
 
                     // i = 0 is back (furthest down); last index is front (row 0).
                     int row = col.Count - 1 - i;
-                    Vector2 local = across * (c * _columnSpacing) + down * (row * _slotSpacing);
+                    float centeredColumnOffset = (c - centerColumn) * _columnSpacing;
+                    Vector2 local =
+                        across * centeredColumnOffset +
+                        down * (row * _slotSpacing);
                     unit.SetWorldPosition((Vector2)_stackRoot.position + local);
                 }
             }

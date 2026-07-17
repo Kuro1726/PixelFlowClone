@@ -31,6 +31,8 @@ namespace PixelFlowClone.Core
 
             Instance = this;
             ResolveMissingReferences();
+            PersistentManagers.EnsureGameManager();
+            PersistentManagers.EnsureLevelManager();
         }
 
         /// <summary>

@@ -18,6 +18,8 @@ public class ConveyorMovementSmokeTest : MonoBehaviour
         GameEvents.OnBlockConsumed += HandleBlockConsumed;
         GameEvents.OnCollectorLapComplete += HandleLapComplete;
         GameEvents.OnCollectorExited += HandleCollectorExited;
+        GameEvents.OnConveyorCountChanged += HandleConveyorCountChanged;
+        GameEvents.OnQueueCountChanged += HandleQueueCountChanged;
     }
 
     private void OnDisable()
@@ -25,6 +27,8 @@ public class ConveyorMovementSmokeTest : MonoBehaviour
         GameEvents.OnBlockConsumed -= HandleBlockConsumed;
         GameEvents.OnCollectorLapComplete -= HandleLapComplete;
         GameEvents.OnCollectorExited -= HandleCollectorExited;
+        GameEvents.OnConveyorCountChanged -= HandleConveyorCountChanged;
+        GameEvents.OnQueueCountChanged -= HandleQueueCountChanged;
     }
 
     private void Start()
@@ -39,6 +43,8 @@ public class ConveyorMovementSmokeTest : MonoBehaviour
     {
         EnsureGridManager();
         EnsureInputManager();
+        PersistentManagers.EnsureGameManager();
+        PersistentManagers.EnsureLevelManager(_level);
 
         if (!QueueManager.HasInstance)
         {
@@ -120,5 +126,15 @@ public class ConveyorMovementSmokeTest : MonoBehaviour
     private static void HandleCollectorExited(CollectorUnit unit)
     {
         Debug.Log($"[SmokeTest] Collector exited: color={unit.Color}");
+    }
+
+    private static void HandleConveyorCountChanged(int active, int max)
+    {
+        Debug.Log($"[SmokeTest] Conveyor count: {active}/{max}");
+    }
+
+    private static void HandleQueueCountChanged(int occupied, int max)
+    {
+        Debug.Log($"[SmokeTest] Queue count: {occupied}/{max}");
     }
 }
