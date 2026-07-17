@@ -7,10 +7,8 @@ using UnityEngine;
 namespace PixelFlowClone.Queue
 {
     /// <summary>
-    /// Multi-column waiting stacks. Each column is an independent vertical queue:
-    /// only that column slides forward when its front is dispatched — units never jump columns.
-    /// Spawn convention: WaitingQueue index 0 = global tail, last = primary front (column 0).
-    /// Units are dealt front-first round-robin into columns.
+    /// Multi-column waiting stacks. Each LevelDataSO waiting column maps directly to one
+    /// independent runtime column, so units never jump between columns.
     /// </summary>
     public class WaitingSlotController : MonoBehaviour
     {
@@ -82,9 +80,12 @@ namespace PixelFlowClone.Queue
         {
             Clear();
 
-            if (level == null || level.WaitingQueue == null || level.WaitingQueue.Length == 0)
+            if (level == null ||
+                level.WaitingColumns == null ||
+                level.WaitingColumns.Length == 0 ||
+                level.CountWaitingCollectors() == 0)
             {
-                Debug.LogWarning("[WaitingSlotController] No WaitingQueue entries to spawn.");
+                Debug.LogWarning("[WaitingSlotController] No WaitingColumns entries to spawn.");
                 return;
             }
 
@@ -95,25 +96,26 @@ namespace PixelFlowClone.Queue
             }
 
             EnsureStackRoot();
+            _columnCount = level.WaitingColumns.Length;
             EnsureColumnCount();
 
-            // Deal front-first round-robin so each column is an independent stack.
-            // Example columns=2, queue [Blue8, Red5, Red10]:
-            //   Col0: Blue8 (back), Red10 (front)
-            //   Col1: Red5 (front)
-            CollectorSpawnEntry[] queue = level.WaitingQueue;
-            for (int depth = 0; depth < queue.Length; depth++)
+            for (int columnIndex = 0; columnIndex < level.WaitingColumns.Length; columnIndex++)
             {
-                CollectorSpawnEntry entry = queue[queue.Length - 1 - depth];
-                int col = depth % ColumnCount;
+                CollectorSpawnColumn column = level.WaitingColumns[columnIndex];
+                if (column.Collectors == null || column.Collectors.Length == 0)
+                    continue;
 
-                CollectorUnit unit = PoolManager.Instance.GetCollector();
-                unit.Initialize(entry.Color, entry.InitialCapacity);
-                unit.ForceState(CollectorState.InWaitingStack);
-                unit.transform.SetParent(_stackRoot, false);
+                for (int i = 0; i < column.Collectors.Length; i++)
+                {
+                    CollectorSpawnEntry entry = column.Collectors[i];
+                    CollectorUnit unit = PoolManager.Instance.GetCollector();
+                    unit.Initialize(entry.Color, entry.InitialCapacity);
+                    unit.ForceState(CollectorState.InWaitingStack);
+                    unit.transform.SetParent(_stackRoot, false);
 
-                // Insert at 0 while walking front→back so the first placed unit stays at list end = front.
-                _columns[col].Insert(0, unit);
+                    // Asset order is back → front, matching the runtime column list.
+                    _columns[columnIndex].Add(unit);
+                }
             }
 
             RefreshLayout();

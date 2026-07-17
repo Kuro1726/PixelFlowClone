@@ -37,7 +37,7 @@ namespace PixelFlowClone.Managers
 
         protected override void OnSingletonAwake()
         {
-            DontDestroyOnLoad(gameObject);
+            MakePersistent();
             EnsurePoolRoots();
             BuildPools();
         }
@@ -121,7 +121,7 @@ namespace PixelFlowClone.Managers
             }
 
             int blockCount = level.CountNonEmptyBlocks();
-            int waiting = level.WaitingQueue != null ? level.WaitingQueue.Length : 0;
+            int waiting = level.CountWaitingCollectors();
             int collectorCount = waiting + config.MaxConveyorUnits + config.MaxQueueSlots;
 
             PrewarmPool(_blockPool, blockCount);

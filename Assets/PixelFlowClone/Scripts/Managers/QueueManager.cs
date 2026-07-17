@@ -40,6 +40,13 @@ namespace PixelFlowClone.Managers
             NotifyQueueCountChanged();
         }
 
+        /// <summary>Clears previous queue state and spawns the waiting collectors for a level.</summary>
+        public void LoadLevel(LevelDataSO level)
+        {
+            _queueSlots?.Clear();
+            SpawnWaitingFromLevel(level);
+        }
+
         /// <summary>Dispatches the primary front waiting unit to the conveyor.</summary>
         public bool TryDispatchFromWaiting() => TryDispatchFromWaiting(GetWaitingQueueFront());
 
@@ -101,7 +108,12 @@ namespace PixelFlowClone.Managers
             int slotIndex = _queueSlots.TryAssignFirstEmpty(unit);
             if (slotIndex < 0)
             {
-                Debug.Log("[QueueManager] Lap enqueue skipped — queue is full.");
+                Debug.Log("[QueueManager] Lap enqueue failed — queue is full. Defeat.");
+                if (GameManager.HasInstance)
+                    GameManager.Instance.DeclareDefeat();
+                else
+                    Debug.LogError("[QueueManager] Cannot declare defeat — GameManager missing.");
+
                 return false;
             }
 

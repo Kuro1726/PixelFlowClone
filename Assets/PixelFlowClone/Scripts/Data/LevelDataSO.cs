@@ -17,8 +17,8 @@ namespace PixelFlowClone.Data
         public Vector2 GridOrigin;
 
         [Header("Collectors")]
-        [Tooltip("Index 0 = tail (back), last index = front (tappable).")]
-        public CollectorSpawnEntry[] WaitingQueue;
+        [Tooltip("Independent waiting columns. Inside each column: index 0 = back, last = front.")]
+        public CollectorSpawnColumn[] WaitingColumns;
 
         [Header("Conveyor")]
         public ConveyorPathSO PathReference;
@@ -41,8 +41,14 @@ namespace PixelFlowClone.Data
                     this);
             }
 
-            if (WaitingQueue == null || WaitingQueue.Length == 0)
-                Debug.LogWarning($"[{name}] WaitingQueue should contain at least one collector.", this);
+            if (WaitingColumns == null || WaitingColumns.Length == 0)
+            {
+                Debug.LogWarning($"[{name}] WaitingColumns should contain at least one column.", this);
+                return;
+            }
+
+            if (CountWaitingCollectors() == 0)
+                Debug.LogWarning($"[{name}] WaitingColumns should contain at least one collector.", this);
         }
 
         public ColorId GetBlockAt(int x, int y)
@@ -68,6 +74,18 @@ namespace PixelFlowClone.Data
                 if (cell != ColorId.None)
                     count++;
             }
+
+            return count;
+        }
+
+        public int CountWaitingCollectors()
+        {
+            if (WaitingColumns == null)
+                return 0;
+
+            int count = 0;
+            for (int i = 0; i < WaitingColumns.Length; i++)
+                count += WaitingColumns[i].Count;
 
             return count;
         }

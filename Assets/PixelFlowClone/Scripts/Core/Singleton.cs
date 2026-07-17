@@ -22,6 +22,18 @@ namespace PixelFlowClone.Core
 
         protected virtual void OnSingletonAwake() { }
 
+        /// <summary>
+        /// Marks this singleton as DontDestroyOnLoad. Unparents first because Unity only
+        /// allows DontDestroyOnLoad on root GameObjects.
+        /// </summary>
+        protected void MakePersistent()
+        {
+            if (transform.parent != null)
+                transform.SetParent(null, true);
+
+            DontDestroyOnLoad(gameObject);
+        }
+
         protected virtual void OnDestroy()
         {
             if (Instance == this)

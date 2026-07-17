@@ -78,6 +78,9 @@ namespace PixelFlowClone.Managers
         /// </summary>
         public bool ProcessTap(Vector2 screenPosition)
         {
+            if (GameManager.HasInstance && !GameManager.Instance.AcceptsGameplayInput)
+                return false;
+
             Camera worldCamera = ResolveWorldCamera();
             if (worldCamera == null)
             {

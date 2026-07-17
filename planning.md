@@ -433,7 +433,7 @@ public class LevelDataSO : ScriptableObject
     public Vector2 GridOrigin;        // World position góc dưới-trái của grid
 
     [Header("Collectors")]
-    public CollectorSpawnEntry[] WaitingQueue;  // Thứ tự: index 0 = đuôi, last = front (tap)
+    public CollectorSpawnColumn[] WaitingColumns; // Mỗi cột độc lập; trong cột: index 0 = back, last = front
 
     [Header("Conveyor")]
     public ConveyorPathSO PathReference;
@@ -602,7 +602,7 @@ public class PoolManager : Singleton<PoolManager>
     public void Prewarm(LevelDataSO level, GameConfigSO config)
     {
         int blockCount = level.BlockMatrix.Count(c => c != ColorId.None);
-        int collectorCount = level.WaitingQueue.Length + config.MaxConveyorUnits + config.MaxQueueSlots;
+        int collectorCount = level.CountWaitingCollectors() + config.MaxConveyorUnits + config.MaxQueueSlots;
 
         for (int i = _collectorPool.CountAll; i < collectorCount; i++)
             _collectorPool.Release(_collectorPool.Get());
@@ -810,13 +810,12 @@ public static class DeadlockDetector
 }
 ```
 
-**Điều kiện thua (Deadlock):** Conveyor đầy `5/5` **VÀ** Queue đầy `5/5` **VÀ** không tồn tại cặp (collector trên conveyor, block còn lại) mà collector có thể consume qua raycast.
+**Điều kiện thua:** Collector hoàn thành lap với capacity > 0 nhưng Queue đã đầy → `Defeat` ngay; collector không được chạy thêm lap trên conveyor.
 
-**Điểm gọi `IsDeadlocked`:**
-- Sau `OnCollectorLapComplete`
-- Sau `OnBlockConsumed`
-- Sau dispatch thất bại khi cả Conveyor và Queue đều full
-- Sau khi tap Queue nhưng conveyor full (debounce 1 frame)
+**Không dùng** công thức “Conveyor đầy + Queue đầy + không reachable consume pair” làm điều kiện thua.
+
+**Điểm gọi Defeat:**
+- Trong `QueueManager.TryEnqueueFromLap` khi không còn slot trống
 
 ---
 
@@ -837,7 +836,7 @@ public static class DeadlockDetector
 | 1.2 | Physics Layers | Layers: `PixelBlock`, `Collector`, `Default` | Cấu hình Layer Collision Matrix |
 | 1.3 | `ColorId`, `CollectorSpawnEntry` | Enum + struct compile | `Scripts/Data/` |
 | 1.4 | `GameConfigSO` + asset | Config asset trong `ScriptableObjects/Config/` | Giá trị mặc định theo schema §1.5 |
-| 1.5 | `LevelDataSO` + `Level_001` | Asset 5×5, 2 màu, 3 collectors trong WaitingQueue | Validate `BlockMatrix.Length` trong `OnValidate()` |
+| 1.5 | `LevelDataSO` + `Level_001` | Asset 5×5, 2 màu, collectors chia rõ theo `WaitingColumns` | Validate `BlockMatrix.Length` trong `OnValidate()` |
 | 1.6 | `Singleton<T>` base class | Core infrastructure | `Scripts/Core/Singleton.cs` |
 | 1.7 | `PoolManager` + prefabs | `PF_PixelBlock`, `PF_CollectorUnit` spawn/release | Prewarm API |
 | 1.8 | `PixelBlock` entity | Sprite theo color, `GridPosition`, `Consume()` | `BoxCollider2D` non-trigger, layer `PixelBlock` |
@@ -867,12 +866,12 @@ public static class DeadlockDetector
 |---|------|------------------|------------------|
 | 2.1 | `CollectorStateMachine` | FSM tách khỏi movement | Valid transitions theo §1.3 |
 | 2.2 | `ITappable` interface | `void OnTap()` | Implement trên `CollectorUnit` |
-| 2.3 | `WaitingSlotController` | Vertical stack spawn từ `WaitingQueue` | Front = last index trong array |
+| 2.3 | `WaitingSlotController` | Spawn từ các `WaitingColumns` độc lập | Trong mỗi cột: front = last index |
 | 2.4 | `QueueSlotController` × 5 | Horizontal slots với world anchors | Index 0–4 |
 | 2.5 | `QueueManager` core | API enqueue, dispatch, occupied count | Không chứa UI logic |
 | 2.6 | Tap Waiting → Conveyor only | `TryDispatchFromWaiting()` | Guard: `ActiveCount < MaxCapacity` |
 | 2.7 | Reject khi conveyor full | Shake animation + return false | Không auto-fallback sang queue |
-| 2.8 | Lap complete → auto queue | `TryEnqueueFromLap(unit)` | `ActiveCount--`, animate tới slot |
+| 2.8 | Lap complete → auto queue | `TryEnqueueFromLap(unit)` | `ActiveCount--`; Queue full → Defeat |
 | 2.9 | Lap complete, capacity = 0 | Exit path, không vào queue | Conveyor slot freed |
 | 2.10 | Manual tap Queue → Conveyor | `TryDispatchFromQueue(slotIndex)` | State `InQueueSlot` → `OnConveyor` |
 | 2.11 | `InputManager` | Screen tap → world raycast → `ITappable` | Unity Input System `Pointer/press` |
@@ -880,11 +879,12 @@ public static class DeadlockDetector
 | 2.13 | `GameManager` state machine | `Playing`, `Victory`, `Defeat` | Block input khi không `Playing` |
 | 2.14 | `LevelManager` | Load level by index, `PlayerPrefs` | Key: `PFC_CurrentLevel` |
 | 2.15 | Win condition | `RemainingBlocks == 0` → `Victory` | Kiểm tra sau mỗi consume |
-| 2.16 | `IDeadlockContext` impl | `DeadlockContextAdapter` wraps managers | Live scene data |
-| 2.17 | `DeadlockDetector` | Pure static, gọi từ `GameManager` | Công thức §1.8 |
-| 2.18 | Defeat condition | `IsDeadlocked` → `Defeat` + event | Popup ở Phase 3 |
-| 2.19 | `CanCollectorReachBlock` | Sample N điểm trên path phía trước collector | Dùng cùng logic raycast sensor |
-| 2.20 | HUD data events | `OnConveyorCountChanged`, `OnQueueCountChanged` | Chưa cần UI visual polish |
+| 2.16 | `IDeadlockContext` (optional) | Adapter/snapshot helpers | Không dùng cho Defeat |
+| 2.17 | `DeadlockDetector` (optional) | Pure static | Không dùng cho Defeat |
+| 2.18 | Defeat condition | Queue full khi lap enqueue | `TryEnqueueFromLap` → `DeclareDefeat` |
+| 2.19 | ~~`CanCollectorReachBlock`~~ | Cancelled | Không còn điều kiện thua theo reachability |
+| 2.20 | ~~`CheckLossCondition` via DeadlockDetector~~ | Cancelled | Defeat đã xử lý ở lap enqueue |
+| 2.21 | HUD data events | `OnConveyorCountChanged`, `OnQueueCountChanged` | Chưa cần UI visual polish |
 
 ---
 
@@ -1039,7 +1039,7 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 
 - [x] **P2-01** Implement `ITappable` interface tại `Scripts/Queue/ITappable.cs`
 - [x] **P2-02** Implement `CollectorUnit.OnTap()` theo state hiện tại
-- [x] **P2-03** Implement `WaitingSlotController` — spawn collectors từ `LevelDataSO.WaitingQueue`
+- [x] **P2-03** Implement `WaitingSlotController` — spawn collectors từ `LevelDataSO.WaitingColumns`
 - [x] **P2-04** Implement `QueueSlotController` — 5 slot anchors, hiển thị unit
 - [x] **P2-05** Implement `QueueManager.TryDispatchFromWaiting()` — chỉ front unit, chỉ lên conveyor
 - [x] **P2-06** Guard `ConveyorPathManager.DispatchToConveyor`: return false nếu `ActiveCount >= MaxCapacity`
@@ -1049,14 +1049,14 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P2-10** Implement `QueueManager.TryDispatchFromQueue(int slotIndex)` — manual tap re-dispatch
 - [x] **P2-11** Implement `InputManager` với Unity Input System (pointer press → world raycast)
 - [x] **P2-12** Implement `GameplayContext` prefab `PF_GameplayContext` wire scene managers
-- [ ] **P2-13** Implement `GameManager` với state machine `Playing/Victory/Defeat`
-- [ ] **P2-14** Implement `LevelManager.LoadLevel(int index)` + `PlayerPrefs` key `PFC_CurrentLevel`
-- [ ] **P2-15** Implement `GameManager.CheckWinCondition()` — `RemainingBlocks == 0`
-- [ ] **P2-16** Implement `IDeadlockContext` interface
-- [ ] **P2-17** Implement `DeadlockContextAdapter` đọc data từ managers runtime
-- [ ] **P2-18** Implement `DeadlockDetector.IsDeadlocked(IDeadlockContext)` pure static
-- [ ] **P2-19** Implement `CanCollectorReachBlock` — sample raycast trên path phía trước
-- [ ] **P2-20** Implement `GameManager.CheckLossCondition()` gọi `DeadlockDetector`
+- [x] **P2-13** Implement `GameManager` với state machine `Playing/Victory/Defeat`
+- [x] **P2-14** Implement `LevelManager.LoadLevel(int index)` + `PlayerPrefs` key `PFC_CurrentLevel`
+- [x] **P2-15** Implement `GameManager.CheckWinCondition()` — `RemainingBlocks == 0`
+- [x] **P2-16** Implement `IDeadlockContext` interface
+- [x] **P2-17** Implement `DeadlockContextAdapter` đọc data từ managers runtime
+- [x] **P2-18** Implement `DeadlockDetector.IsDeadlocked(IDeadlockContext)` pure static *(optional; không dùng cho Defeat)*
+- [~] **P2-19** ~~Implement `CanCollectorReachBlock`~~ — cancelled (không còn lose theo reachability)
+- [x] **P2-20** Defeat khi lap enqueue Queue full (`TryEnqueueFromLap` → `DeclareDefeat`)
 - [ ] **P2-21** Wire `GameEvents.OnConveyorCountChanged` và `OnQueueCountChanged`
 - [ ] **P2-22** Test thủ công scenario: tap waiting → conveyor, lap → queue, tap queue → conveyor
 - [ ] **P2-23** Test thủ công scenario: conveyor full + tap waiting → reject (không vào queue)
@@ -1116,7 +1116,7 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 | Queue entry | Chỉ sau lap complete khi `Capacity > 0` |
 | Re-dispatch | Tap thủ công trên unit trong Queue slot |
 | Consume mechanism | Perpendicular `Physics2D.Raycast`, không dùng Dynamic collision |
-| Deadlock | Conveyor 5/5 + Queue 5/5 + không có reachable consume pair |
+| Defeat | Lap enqueue gặp Queue full (capacity > 0). Không dùng deadlock reachable-pair. |
 | Singleton scope | Global: Game, UI, Pool, Audio, Input, Level; Scene: Grid, Conveyor, Queue |
 | Object lifecycle | Pool only — không `Destroy()` runtime cho Collector và PixelBlock |
 

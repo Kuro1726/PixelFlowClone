@@ -32,6 +32,8 @@ namespace PixelFlowClone.Managers
 
         public GameConfigSO Config => _config;
 
+        public Transform PathRoot => _pathRoot;
+
         public IReadOnlyList<CollectorUnit> ActiveUnits => _activeUnits;
 
         public IReadOnlyList<ConveyorWaypoint> Waypoints => _waypoints;
@@ -157,6 +159,9 @@ namespace PixelFlowClone.Managers
 
         private void FixedUpdate()
         {
+            if (GameManager.HasInstance && !GameManager.Instance.AcceptsGameplayInput)
+                return;
+
             if (_waypoints.Count == 0 || _activeUnits.Count == 0)
                 return;
 
@@ -221,6 +226,22 @@ namespace PixelFlowClone.Managers
 
             _unitWaypointIndices.Remove(unit);
             _hasLeftEntrySinceDispatch.Remove(unit);
+            NotifyConveyorCountChanged();
+        }
+
+        /// <summary>Removes all active collectors when rebuilding or leaving a level.</summary>
+        public void ClearActiveUnits()
+        {
+            for (int i = _activeUnits.Count - 1; i >= 0; i--)
+            {
+                CollectorUnit unit = _activeUnits[i];
+                if (unit != null && PoolManager.HasInstance)
+                    PoolManager.Instance.ReleaseCollector(unit);
+            }
+
+            _activeUnits.Clear();
+            _unitWaypointIndices.Clear();
+            _hasLeftEntrySinceDispatch.Clear();
             NotifyConveyorCountChanged();
         }
 

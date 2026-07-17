@@ -1,4 +1,5 @@
 using PixelFlowClone.Core;
+using PixelFlowClone.Data;
 using PixelFlowClone.Managers;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -15,6 +16,8 @@ namespace PixelFlowClone.Editor
         private const string ScenePath = "Assets/PixelFlowClone/Scenes/SCN_Gameplay.unity";
         private const string PrefabFolder = "Assets/PixelFlowClone/Prefabs/Gameplay";
         private const string PrefabPath = PrefabFolder + "/PF_GameplayContext.prefab";
+        private const string DefaultLevelPath =
+            "Assets/PixelFlowClone/ScriptableObjects/Levels/Level_001.asset";
 
         [InitializeOnLoadMethod]
         private static void BuildMissingPrefabWhenGameplaySceneIsOpen()
@@ -24,7 +27,10 @@ namespace PixelFlowClone.Editor
                 if (EditorApplication.isPlayingOrWillChangePlaymode)
                     return;
 
-                if (AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath) != null)
+                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+                if (prefab != null &&
+                    prefab.GetComponentInChildren<GameManager>(true) != null &&
+                    prefab.GetComponentInChildren<LevelManager>(true) != null)
                     return;
 
                 if (SceneManager.GetActiveScene().path == ScenePath)
@@ -64,6 +70,30 @@ namespace PixelFlowClone.Editor
                 inputObject.transform.SetParent(root.transform, false);
                 input = inputObject.AddComponent<InputManager>();
             }
+
+            GameManager game = root.GetComponentInChildren<GameManager>(true);
+            if (game == null)
+            {
+                var gameObject = new GameObject("GameManager");
+                gameObject.transform.SetParent(root.transform, false);
+                gameObject.AddComponent<GameManager>();
+            }
+
+            LevelManager levelManager = root.GetComponentInChildren<LevelManager>(true);
+            if (levelManager == null)
+            {
+                var levelObject = new GameObject("LevelManager");
+                levelObject.transform.SetParent(root.transform, false);
+                levelManager = levelObject.AddComponent<LevelManager>();
+            }
+
+            LevelDataSO defaultLevel = AssetDatabase.LoadAssetAtPath<LevelDataSO>(DefaultLevelPath);
+            var levelManagerObject = new SerializedObject(levelManager);
+            SerializedProperty levels = levelManagerObject.FindProperty("_levels");
+            levels.arraySize = defaultLevel != null ? 1 : 0;
+            if (defaultLevel != null)
+                levels.GetArrayElementAtIndex(0).objectReferenceValue = defaultLevel;
+            levelManagerObject.ApplyModifiedPropertiesWithoutUndo();
 
             GameplayContext context = root.GetComponent<GameplayContext>();
             if (context == null)

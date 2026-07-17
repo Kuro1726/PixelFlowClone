@@ -99,11 +99,23 @@ namespace PixelFlowClone.Editor
             level.CellSpacing = new Vector2(1f, 1f);
             level.GridOrigin = new Vector2(-2f, -2f);
             level.BlockMatrix = CreateLevel001BlockMatrix();
-            level.WaitingQueue = new[]
+            level.WaitingColumns = new[]
             {
-                new CollectorSpawnEntry { Color = ColorId.Blue, InitialCapacity = 8 },
-                new CollectorSpawnEntry { Color = ColorId.Red, InitialCapacity = 5 },
-                new CollectorSpawnEntry { Color = ColorId.Red, InitialCapacity = 10 }
+                new CollectorSpawnColumn
+                {
+                    Collectors = new[]
+                    {
+                        new CollectorSpawnEntry { Color = ColorId.Blue, InitialCapacity = 8 },
+                        new CollectorSpawnEntry { Color = ColorId.Red, InitialCapacity = 10 }
+                    }
+                },
+                new CollectorSpawnColumn
+                {
+                    Collectors = new[]
+                    {
+                        new CollectorSpawnEntry { Color = ColorId.Red, InitialCapacity = 5 }
+                    }
+                }
             };
             level.PathReference = path;
 
