@@ -1042,13 +1042,13 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P2-03** Implement `WaitingSlotController` — spawn collectors từ `LevelDataSO.WaitingQueue`
 - [x] **P2-04** Implement `QueueSlotController` — 5 slot anchors, hiển thị unit
 - [x] **P2-05** Implement `QueueManager.TryDispatchFromWaiting()` — chỉ front unit, chỉ lên conveyor
-- [ ] **P2-06** Guard `ConveyorPathManager.DispatchToConveyor`: return false nếu `ActiveCount >= MaxCapacity`
-- [ ] **P2-07** Implement reject feedback stub (log/SFX placeholder) khi conveyor full
-- [ ] **P2-08** Implement `QueueManager.TryEnqueueFromLap(CollectorUnit)` — auto assign slot trống
-- [ ] **P2-09** Decrement `ConveyorPathManager.ActiveCount` khi unit rời conveyor vào queue
-- [ ] **P2-10** Implement `QueueManager.TryDispatchFromQueue(int slotIndex)` — manual tap re-dispatch
-- [ ] **P2-11** Implement `InputManager` với Unity Input System (pointer press → world raycast)
-- [ ] **P2-12** Implement `GameplayContext` prefab `PF_GameplayContext` wire scene managers
+- [x] **P2-06** Guard `ConveyorPathManager.DispatchToConveyor`: return false nếu `ActiveCount >= MaxCapacity`
+- [x] **P2-07** Implement reject feedback stub (log/SFX placeholder) khi conveyor full
+- [x] **P2-08** Implement `QueueManager.TryEnqueueFromLap(CollectorUnit)` — auto assign slot trống
+- [x] **P2-09** Decrement `ConveyorPathManager.ActiveCount` khi unit rời conveyor vào queue
+- [x] **P2-10** Implement `QueueManager.TryDispatchFromQueue(int slotIndex)` — manual tap re-dispatch
+- [x] **P2-11** Implement `InputManager` với Unity Input System (pointer press → world raycast)
+- [x] **P2-12** Implement `GameplayContext` prefab `PF_GameplayContext` wire scene managers
 - [ ] **P2-13** Implement `GameManager` với state machine `Playing/Victory/Defeat`
 - [ ] **P2-14** Implement `LevelManager.LoadLevel(int index)` + `PlayerPrefs` key `PFC_CurrentLevel`
 - [ ] **P2-15** Implement `GameManager.CheckWinCondition()` — `RemainingBlocks == 0`

@@ -22,7 +22,7 @@ MonoBehaviour:
   - Color: 2
     InitialCapacity: 8
   - Color: 1
-    InitialCapacity: 5
+    InitialCapacity: 3
   - Color: 1
     InitialCapacity: 10
   PathReference: {fileID: 11400000, guid: 2b3c4d5e6f708192a3b4c5d6e7f8091a, type: 2}

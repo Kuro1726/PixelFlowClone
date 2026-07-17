@@ -108,7 +108,10 @@ namespace PixelFlowClone.Managers
 
         public bool DispatchToConveyor(CollectorUnit unit)
         {
-            if (unit == null || !HasCapacity)
+            if (unit == null)
+                return false;
+
+            if (ActiveCount >= MaxCapacity)
                 return false;
 
             if (_activeUnits.Contains(unit))
@@ -161,7 +164,8 @@ namespace PixelFlowClone.Managers
             float speed = MoveSpeed;
             float reachEpsilon = WaypointReachEpsilon;
 
-            for (int i = 0; i < _activeUnits.Count; i++)
+            // Iterate backwards because lap/exit callbacks may unregister the current unit.
+            for (int i = _activeUnits.Count - 1; i >= 0; i--)
             {
                 CollectorUnit unit = _activeUnits[i];
                 if (unit == null || unit.State != CollectorState.OnConveyor)

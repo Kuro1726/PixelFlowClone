@@ -10,6 +10,7 @@ namespace PixelFlowClone.Core
     {
         public static event Action<int, int> OnConveyorCountChanged;
         public static event Action<int, int> OnQueueCountChanged;
+        public static event Action<CollectorUnit> OnConveyorDispatchRejected;
         public static event Action OnBlockConsumed;
         public static event Action<CollectorUnit> OnCollectorExited;
         public static event Action<CollectorUnit> OnCollectorLapComplete;
@@ -22,6 +23,9 @@ namespace PixelFlowClone.Core
 
         public static void RaiseQueueCountChanged(int occupied, int max)
             => OnQueueCountChanged?.Invoke(occupied, max);
+
+        public static void RaiseConveyorDispatchRejected(CollectorUnit unit)
+            => OnConveyorDispatchRejected?.Invoke(unit);
 
         public static void RaiseBlockConsumed()
             => OnBlockConsumed?.Invoke();
@@ -48,6 +52,7 @@ namespace PixelFlowClone.Core
         {
             OnConveyorCountChanged = null;
             OnQueueCountChanged = null;
+            OnConveyorDispatchRejected = null;
             OnBlockConsumed = null;
             OnCollectorExited = null;
             OnCollectorLapComplete = null;

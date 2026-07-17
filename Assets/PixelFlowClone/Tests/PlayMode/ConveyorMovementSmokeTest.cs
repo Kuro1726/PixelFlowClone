@@ -2,19 +2,16 @@ using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.Entities;
 using PixelFlowClone.Managers;
-using PixelFlowClone.Queue;
 using UnityEngine;
 
 /// <summary>
 /// Play Mode harness: Level_001 grid + waiting spawn.
-/// Temporary mouse tap probe until InputManager (P2-11).
+/// Taps go through <see cref="InputManager"/> (P2-11).
 /// </summary>
 public class ConveyorMovementSmokeTest : MonoBehaviour
 {
     [SerializeField] private LevelDataSO _level;
     [SerializeField] private GameConfigSO _config;
-    [Tooltip("Temporary: click collectors in Game view until InputManager exists.")]
-    [SerializeField] private bool _enableTemporaryTapProbe = true;
 
     private void OnEnable()
     {
@@ -38,43 +35,10 @@ public class ConveyorMovementSmokeTest : MonoBehaviour
         RunSmokeTest();
     }
 
-    private void Update()
-    {
-        if (!_enableTemporaryTapProbe)
-            return;
-
-        if (!Input.GetMouseButtonDown(0))
-            return;
-
-        Camera cam = Camera.main;
-        if (cam == null)
-            return;
-
-        Vector3 screen = Input.mousePosition;
-        screen.z = Mathf.Abs(cam.transform.position.z);
-        Vector3 world = cam.ScreenToWorldPoint(screen);
-        Vector2 point = new Vector2(world.x, world.y);
-        Collider2D hit = Physics2D.OverlapPoint(point);
-        if (hit == null)
-        {
-            Debug.Log($"[SmokeTest] Tap miss at {point}");
-            return;
-        }
-
-        ITappable tappable = hit.GetComponentInParent<ITappable>();
-        if (tappable == null)
-        {
-            Debug.Log($"[SmokeTest] Tap hit {hit.name} but no ITappable");
-            return;
-        }
-
-        Debug.Log($"[SmokeTest] Tap hit ITappable on {hit.name}");
-        tappable.OnTap();
-    }
-
     private void RunSmokeTest()
     {
         EnsureGridManager();
+        EnsureInputManager();
 
         if (!QueueManager.HasInstance)
         {
@@ -87,7 +51,8 @@ public class ConveyorMovementSmokeTest : MonoBehaviour
         GridManager.Instance.SpawnGrid(_level);
         Debug.Log(
             $"[SmokeTest] Spawned grid RemainingBlocks={GridManager.Instance.RemainingBlocks}, " +
-            $"waiting={QueueManager.Instance.Waiting?.Count ?? 0}. Click a front waiting unit in Game view.");
+            $"waiting={QueueManager.Instance.Waiting?.Count ?? 0}. " +
+            "Tap front waiting / queue units via InputManager.");
     }
 
     private bool ValidateSetup()
@@ -129,6 +94,16 @@ public class ConveyorMovementSmokeTest : MonoBehaviour
         var go = new GameObject("GridManager");
         go.AddComponent<GridManager>();
         Debug.Log("[SmokeTest] Created GridManager at runtime.");
+    }
+
+    private static void EnsureInputManager()
+    {
+        if (InputManager.HasInstance)
+            return;
+
+        var go = new GameObject("InputManager");
+        go.AddComponent<InputManager>();
+        Debug.Log("[SmokeTest] Created InputManager at runtime.");
     }
 
     private void HandleBlockConsumed()

@@ -7,9 +7,10 @@ using UnityEngine;
 namespace PixelFlowClone.Queue
 {
     /// <summary>
-    /// Waiting stack with optional multi-column layout.
-    /// Convention: array index 0 = tail, last index = nearest to conveyor.
-    /// Front row (all units with depth &lt; ColumnCount) are tappable — e.g. with 2 columns, A|B both Front.
+    /// Multi-column waiting stacks. Each column is an independent vertical queue:
+    /// only that column slides forward when its front is dispatched — units never jump columns.
+    /// Spawn convention: WaitingQueue index 0 = global tail, last = primary front (column 0).
+    /// Units are dealt front-first round-robin into columns.
     /// </summary>
     public class WaitingSlotController : MonoBehaviour
     {
@@ -21,18 +22,61 @@ namespace PixelFlowClone.Queue
         [SerializeField] private Vector2 _stackDirection = Vector2.down;
         [SerializeField] private Vector2 _columnDirection = Vector2.right;
 
-        private readonly List<CollectorUnit> _stack = new();
+        private readonly List<List<CollectorUnit>> _columns = new();
+        private readonly List<CollectorUnit> _flatCache = new();
+        private int _restoreColumn = -1;
 
-        public int Count => _stack.Count;
-        public bool IsEmpty => _stack.Count == 0;
-        public IReadOnlyList<CollectorUnit> Units => _stack;
+        public int Count
+        {
+            get
+            {
+                int total = 0;
+                for (int c = 0; c < _columns.Count; c++)
+                    total += _columns[c].Count;
+                return total;
+            }
+        }
+
+        public bool IsEmpty => Count == 0;
+
+        public IReadOnlyList<CollectorUnit> Units
+        {
+            get
+            {
+                RebuildFlatCache();
+                return _flatCache;
+            }
+        }
+
         public int ColumnCount => Mathf.Max(1, _columnCount);
 
-        /// <summary>Primary front (depth 0, left column). Prefer <see cref="IsFront"/> for tap checks.</summary>
-        public CollectorUnit Front => _stack.Count > 0 ? _stack[_stack.Count - 1] : null;
+        /// <summary>Front of column 0 (primary). Prefer <see cref="IsFront"/> for tap checks.</summary>
+        public CollectorUnit Front
+        {
+            get
+            {
+                EnsureColumnCount();
+                List<CollectorUnit> col = _columns[0];
+                return col.Count > 0 ? col[col.Count - 1] : null;
+            }
+        }
 
-        /// <summary>How many units sit on the front row and may be tapped.</summary>
-        public int FrontRowCount => Mathf.Min(ColumnCount, _stack.Count);
+        /// <summary>How many columns currently have a tappable front unit.</summary>
+        public int FrontRowCount
+        {
+            get
+            {
+                EnsureColumnCount();
+                int n = 0;
+                for (int c = 0; c < _columns.Count; c++)
+                {
+                    if (_columns[c].Count > 0)
+                        n++;
+                }
+
+                return n;
+            }
+        }
 
         public void SpawnFromLevel(LevelDataSO level)
         {
@@ -51,16 +95,25 @@ namespace PixelFlowClone.Queue
             }
 
             EnsureStackRoot();
+            EnsureColumnCount();
 
-            // Preserve array order: index 0 stays at back of List, last stays nearest front.
-            for (int i = 0; i < level.WaitingQueue.Length; i++)
+            // Deal front-first round-robin so each column is an independent stack.
+            // Example columns=2, queue [Blue8, Red5, Red10]:
+            //   Col0: Blue8 (back), Red10 (front)
+            //   Col1: Red5 (front)
+            CollectorSpawnEntry[] queue = level.WaitingQueue;
+            for (int depth = 0; depth < queue.Length; depth++)
             {
-                CollectorSpawnEntry entry = level.WaitingQueue[i];
+                CollectorSpawnEntry entry = queue[queue.Length - 1 - depth];
+                int col = depth % ColumnCount;
+
                 CollectorUnit unit = PoolManager.Instance.GetCollector();
                 unit.Initialize(entry.Color, entry.InitialCapacity);
                 unit.ForceState(CollectorState.InWaitingStack);
                 unit.transform.SetParent(_stackRoot, false);
-                _stack.Add(unit);
+
+                // Insert at 0 while walking front→back so the first placed unit stays at list end = front.
+                _columns[col].Insert(0, unit);
             }
 
             RefreshLayout();
@@ -69,20 +122,24 @@ namespace PixelFlowClone.Queue
 
         public CollectorUnit PeekFront() => Front;
 
-        /// <summary>Fills buffer with every unit currently on the front row (left→right by depth).</summary>
+        /// <summary>Fills buffer with every column-front unit (left→right).</summary>
         public void GetFronts(List<CollectorUnit> buffer)
         {
             if (buffer == null)
                 return;
 
             buffer.Clear();
-            int n = FrontRowCount;
-            for (int depth = 0; depth < n; depth++)
-                buffer.Add(_stack[_stack.Count - 1 - depth]);
+            EnsureColumnCount();
+            for (int c = 0; c < _columns.Count; c++)
+            {
+                List<CollectorUnit> col = _columns[c];
+                if (col.Count > 0)
+                    buffer.Add(col[col.Count - 1]);
+            }
         }
 
         /// <summary>
-        /// Removes the primary front (depth 0). Prefer <see cref="TryPop"/> when the player taps a specific Front.
+        /// Removes the primary front (column 0). Prefer <see cref="TryPop"/> when tapping a specific front.
         /// </summary>
         public CollectorUnit PopFront()
         {
@@ -90,15 +147,16 @@ namespace PixelFlowClone.Queue
         }
 
         /// <summary>
-        /// Removes a front-row unit after successful conveyor dispatch.
-        /// Does not release to pool — ownership moves to ConveyorPathManager.
+        /// Removes a column-front unit after successful conveyor dispatch.
+        /// Only that column slides forward; other columns stay put.
         /// </summary>
         public CollectorUnit TryPop(CollectorUnit unit)
         {
-            if (!IsFront(unit))
+            if (!TryFindFront(unit, out int column, out int indexInColumn))
                 return null;
 
-            _stack.Remove(unit);
+            _columns[column].RemoveAt(indexInColumn);
+            _restoreColumn = column;
             unit.transform.SetParent(null, true);
 
             RefreshLayout();
@@ -106,84 +164,93 @@ namespace PixelFlowClone.Queue
             return unit;
         }
 
-        public bool Contains(CollectorUnit unit) => unit != null && _stack.Contains(unit);
+        public bool Contains(CollectorUnit unit)
+        {
+            return unit != null && TryFind(unit, out _, out _);
+        }
 
-        /// <summary>True if unit is on the front row (any column) and may be tapped.</summary>
+        /// <summary>True if unit is the front of its column and may be tapped.</summary>
         public bool IsFront(CollectorUnit unit)
         {
-            if (unit == null)
-                return false;
-
-            int index = _stack.IndexOf(unit);
-            if (index < 0)
-                return false;
-
-            return DepthFromFront(index) < ColumnCount;
+            return TryFindFront(unit, out _, out _);
         }
 
         public void Clear()
         {
             if (PoolManager.HasInstance)
             {
-                for (int i = 0; i < _stack.Count; i++)
+                for (int c = 0; c < _columns.Count; c++)
                 {
-                    if (_stack[i] != null)
-                        PoolManager.Instance.ReleaseCollector(_stack[i]);
+                    List<CollectorUnit> col = _columns[c];
+                    for (int i = 0; i < col.Count; i++)
+                    {
+                        if (col[i] != null)
+                            PoolManager.Instance.ReleaseCollector(col[i]);
+                    }
                 }
             }
 
-            _stack.Clear();
+            for (int c = 0; c < _columns.Count; c++)
+                _columns[c].Clear();
+
+            _flatCache.Clear();
+            _restoreColumn = -1;
         }
 
         public void RefreshLayout()
         {
             EnsureStackRoot();
+            EnsureColumnCount();
+
             Vector2 down = _stackDirection.sqrMagnitude > 0.0001f
                 ? _stackDirection.normalized
                 : Vector2.down;
             Vector2 across = _columnDirection.sqrMagnitude > 0.0001f
                 ? _columnDirection.normalized
                 : Vector2.right;
-            int columns = ColumnCount;
 
-            // Front row (depth 0..columns-1) is fully tappable. Example columns=2:
-            //   A | B   ← both Front
-            //   C | D
-            for (int i = 0; i < _stack.Count; i++)
+            for (int c = 0; c < _columns.Count; c++)
             {
-                CollectorUnit unit = _stack[i];
-                if (unit == null)
-                    continue;
+                List<CollectorUnit> col = _columns[c];
+                for (int i = 0; i < col.Count; i++)
+                {
+                    CollectorUnit unit = col[i];
+                    if (unit == null)
+                        continue;
 
-                int depthFromFront = DepthFromFront(i);
-                int column = depthFromFront % columns;
-                int row = depthFromFront / columns;
-                Vector2 local = across * (column * _columnSpacing) + down * (row * _slotSpacing);
-                unit.SetWorldPosition((Vector2)_stackRoot.position + local);
+                    // i = 0 is back (furthest down); last index is front (row 0).
+                    int row = col.Count - 1 - i;
+                    Vector2 local = across * (c * _columnSpacing) + down * (row * _slotSpacing);
+                    unit.SetWorldPosition((Vector2)_stackRoot.position + local);
+                }
             }
         }
 
         /// <summary>
-        /// Every front-row unit keeps a pickable collider; deeper units cannot be tapped.
+        /// Only each column's front unit keeps a pickable collider.
         /// </summary>
         public void RefreshFrontTappable()
         {
-            int columns = ColumnCount;
-            for (int i = 0; i < _stack.Count; i++)
+            EnsureColumnCount();
+            for (int c = 0; c < _columns.Count; c++)
             {
-                CollectorUnit unit = _stack[i];
-                if (unit == null)
-                    continue;
+                List<CollectorUnit> col = _columns[c];
+                for (int i = 0; i < col.Count; i++)
+                {
+                    CollectorUnit unit = col[i];
+                    if (unit == null)
+                        continue;
 
-                bool isFrontRow = DepthFromFront(i) < columns;
-                Collider2D col = unit.GetComponent<Collider2D>();
-                if (col != null)
-                    col.enabled = isFrontRow;
+                    bool isFront = i == col.Count - 1;
+                    Collider2D collider = unit.GetComponent<Collider2D>();
+                    if (collider != null)
+                        collider.enabled = isFront;
+                }
             }
         }
 
         /// <summary>
-        /// Puts a unit back on the front of the waiting stack after a failed conveyor dispatch.
+        /// Puts a unit back onto the column it was popped from after a failed conveyor dispatch.
         /// </summary>
         public void RestoreFront(CollectorUnit unit)
         {
@@ -191,14 +258,92 @@ namespace PixelFlowClone.Queue
                 return;
 
             EnsureStackRoot();
-            _stack.Add(unit);
+            EnsureColumnCount();
+
+            int col = _restoreColumn >= 0 && _restoreColumn < _columns.Count
+                ? _restoreColumn
+                : 0;
+
+            _columns[col].Add(unit);
+            _restoreColumn = -1;
+
             unit.ForceState(CollectorState.InWaitingStack);
             unit.transform.SetParent(_stackRoot, false);
             RefreshLayout();
             RefreshFrontTappable();
         }
 
-        private int DepthFromFront(int index) => _stack.Count - 1 - index;
+        private bool TryFindFront(CollectorUnit unit, out int column, out int indexInColumn)
+        {
+            if (!TryFind(unit, out column, out indexInColumn))
+                return false;
+
+            return indexInColumn == _columns[column].Count - 1;
+        }
+
+        private bool TryFind(CollectorUnit unit, out int column, out int indexInColumn)
+        {
+            column = -1;
+            indexInColumn = -1;
+            if (unit == null)
+                return false;
+
+            EnsureColumnCount();
+            for (int c = 0; c < _columns.Count; c++)
+            {
+                int index = _columns[c].IndexOf(unit);
+                if (index < 0)
+                    continue;
+
+                column = c;
+                indexInColumn = index;
+                return true;
+            }
+
+            return false;
+        }
+
+        private void EnsureColumnCount()
+        {
+            int needed = ColumnCount;
+            while (_columns.Count < needed)
+                _columns.Add(new List<CollectorUnit>());
+
+            // If inspector reduced column count after spawn, fold extras into last kept column.
+            while (_columns.Count > needed)
+            {
+                List<CollectorUnit> extra = _columns[_columns.Count - 1];
+                _columns.RemoveAt(_columns.Count - 1);
+                if (extra.Count == 0)
+                    continue;
+
+                List<CollectorUnit> target = _columns[_columns.Count - 1];
+                for (int i = 0; i < extra.Count; i++)
+                    target.Insert(i, extra[i]);
+            }
+        }
+
+        private void RebuildFlatCache()
+        {
+            _flatCache.Clear();
+            EnsureColumnCount();
+
+            // Back→front, left→right within each depth-ish order for debug/readout.
+            int maxRows = 0;
+            for (int c = 0; c < _columns.Count; c++)
+                maxRows = Mathf.Max(maxRows, _columns[c].Count);
+
+            for (int backOffset = maxRows - 1; backOffset >= 0; backOffset--)
+            {
+                for (int c = 0; c < _columns.Count; c++)
+                {
+                    List<CollectorUnit> col = _columns[c];
+                    int index = col.Count - 1 - backOffset;
+                    if (index >= 0)
+                        _flatCache.Add(col[index]);
+                }
+            }
+        }
 
         private void EnsureStackRoot()
         {

@@ -60,7 +60,13 @@ namespace PixelFlowClone.Entities
                         TryDispatchToConveyorFromTap();
                     break;
                 case CollectorState.InQueueSlot:
-                    TryDispatchToConveyorFromTap();
+                    if (QueueManager.HasInstance)
+                    {
+                        bool ok = QueueManager.Instance.TryDispatchFromQueue(this);
+                        Debug.Log($"[CollectorUnit] Queue dispatch via QueueManager → {(ok ? "OK" : "REJECTED")}");
+                    }
+                    else
+                        TryDispatchToConveyorFromTap();
                     break;
                 case CollectorState.OnConveyor:
                 case CollectorState.Exiting:
@@ -297,8 +303,13 @@ namespace PixelFlowClone.Entities
         public void OnLapComplete()
         {
             if (Capacity <= 0)
+            {
                 BeginExit();
-            // Phase 2: else → InQueueSlot via QueueManager.
+                return;
+            }
+
+            if (QueueManager.HasInstance)
+                QueueManager.Instance.TryEnqueueFromLap(this);
         }
 
         /// <summary>
