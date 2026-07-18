@@ -33,6 +33,13 @@ public class ConveyorMovementSmokeTest : MonoBehaviour
 
     private void Start()
     {
+        // Menu → Play already selected a level; skip harness spawn so LevelManager.Apply owns the scene.
+        if (LevelManager.HasInstance && LevelManager.Instance.CurrentLevel != null)
+        {
+            Debug.Log("[SmokeTest] Skipped auto-spawn — LevelManager CurrentLevel is set.");
+            return;
+        }
+
         if (!ValidateSetup())
             return;
 

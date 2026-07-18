@@ -1,7 +1,9 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using PixelFlowClone.Core;
 using PixelFlowClone.Data;
+using PixelFlowClone.UI.Screens;
 using UnityEngine;
 
 namespace PixelFlowClone.Managers
@@ -15,10 +17,14 @@ namespace PixelFlowClone.Managers
 
         [SerializeField] private LevelDataSO[] _levels;
         [SerializeField] private bool _loadSavedLevelOnStart = true;
+        [SerializeField] private float _gameplayLoadMinSeconds = 0.75f;
+
+        private Coroutine _playRoutine;
 
         public int CurrentLevelIndex { get; private set; }
         public LevelDataSO CurrentLevel { get; private set; }
         public IReadOnlyList<LevelDataSO> Levels => _levels ?? Array.Empty<LevelDataSO>();
+        public bool IsLoadingGameplay => _playRoutine != null;
 
         public event Action<LevelDataSO, int> LevelLoaded;
 
@@ -40,6 +46,89 @@ namespace PixelFlowClone.Managers
 
             int savedIndex = Mathf.Clamp(CurrentLevelIndex, 0, _levels.Length - 1);
             LoadLevel(savedIndex);
+        }
+
+        /// <summary>
+        /// Main Menu: persist level index then async-load gameplay and apply it.
+        /// </summary>
+        public void PlayLevel(int index)
+        {
+            if (_playRoutine != null)
+            {
+                Debug.LogWarning("[LevelManager] PlayLevel ignored — already loading.");
+                return;
+            }
+
+            if (_levels == null || _levels.Length == 0)
+            {
+                Debug.LogWarning("[LevelManager] No levels are assigned.");
+                return;
+            }
+
+            if (index < 0 || index >= _levels.Length)
+            {
+                Debug.LogWarning($"[LevelManager] Invalid level index {index}.");
+                return;
+            }
+
+            CurrentLevelIndex = index;
+            _playRoutine = StartCoroutine(PlayCurrentLevelRoutine());
+        }
+
+        /// <summary>
+        /// Plays the saved/current level index.
+        /// </summary>
+        public void PlayCurrentLevel()
+        {
+            if (_levels == null || _levels.Length == 0)
+            {
+                Debug.LogWarning("[LevelManager] No levels are assigned.");
+                return;
+            }
+
+            PlayLevel(Mathf.Clamp(CurrentLevelIndex, 0, _levels.Length - 1));
+        }
+
+        private IEnumerator PlayCurrentLevelRoutine()
+        {
+            if (_levels == null || _levels.Length == 0)
+            {
+                Debug.LogWarning("[LevelManager] No levels are assigned.");
+                _playRoutine = null;
+                yield break;
+            }
+
+            int index = Mathf.Clamp(CurrentLevelIndex, 0, _levels.Length - 1);
+            if (!LoadLevel(index))
+            {
+                _playRoutine = null;
+                yield break;
+            }
+
+            if (GameManager.HasInstance)
+                GameManager.Instance.BeginLoading();
+
+            LoadingScreen loading = LoadingScreen.CreateRuntime(transform);
+            loading.SetTitle(LoadingScreen.DefaultTitle);
+            loading.SetStatus(LoadingScreen.DefaultStatus);
+            loading.SetProgress(0f);
+            loading.Show();
+
+            Debug.Log(
+                $"[LevelManager] Play level index={index}, id={CurrentLevel.LevelId} → " +
+                $"{SceneLoader.GameplaySceneName}");
+
+            yield return SceneLoader.LoadAsync(
+                SceneLoader.GameplaySceneName,
+                loading.SetProgress,
+                minDurationSeconds: Mathf.Max(0f, _gameplayLoadMinSeconds));
+
+            ApplyCurrentLevelToGameplay();
+
+            if (loading != null)
+                Destroy(loading.gameObject);
+
+            _playRoutine = null;
         }
 
         /// <summary>
@@ -142,6 +231,9 @@ namespace PixelFlowClone.Managers
 
         [ContextMenu("Debug/Load Next Level")]
         private void DebugLoadNextLevel() => LoadNextLevel();
+
+        [ContextMenu("Debug/Play Current Level")]
+        private void DebugPlayCurrentLevel() => PlayCurrentLevel();
 #endif
     }
 }
