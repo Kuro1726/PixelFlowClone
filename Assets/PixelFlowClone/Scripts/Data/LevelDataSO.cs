@@ -20,20 +20,20 @@ namespace PixelFlowClone.Data
         [Tooltip("Independent waiting columns. Inside each column: index 0 = back, last = front.")]
         public CollectorSpawnColumn[] WaitingColumns;
 
-        [Header("Layout")]
-        [Tooltip("World units from conveyor bottom edge down to the queue row. ≤0 uses default.")]
+        [Header("Layout (optional overrides)")]
+        [Tooltip("≤0 dùng GameConfig. >0 ghi đè khoảng từ đáy conveyor xuống queue.")]
         public float QueueGapBelowPath;
 
-        [Tooltip("World units from queue row down to waiting front. ≤0 uses default.")]
+        [Tooltip("≤0 dùng GameConfig. >0 ghi đè khoảng từ queue xuống waiting.")]
         public float WaitingGapBelowQueue;
 
-        [Tooltip("Spacing between collectors in the horizontal queue. ≤0 uses scene default (≈1.1).")]
+        [Tooltip("≤0 dùng GameConfig. >0 ghi đè spacing hàng queue.")]
         public float QueueUnitSpacing;
 
-        [Tooltip("Spacing between collectors in a waiting column (vertical). ≤0 uses scene default (≈1.1).")]
+        [Tooltip("≤0 dùng GameConfig. >0 ghi đè spacing cột waiting (dọc).")]
         public float WaitingUnitSpacing;
 
-        [Tooltip("Spacing between waiting columns (horizontal). ≤0 uses scene default (≈1.1).")]
+        [Tooltip("≤0 dùng GameConfig. >0 ghi đè spacing giữa các cột waiting.")]
         public float WaitingColumnSpacing;
 
         [Header("Conveyor")]

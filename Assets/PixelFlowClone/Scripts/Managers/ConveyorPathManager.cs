@@ -37,7 +37,7 @@ namespace PixelFlowClone.Managers
 
         public Transform PathRoot => _pathRoot;
 
-        public float PathMargin => Mathf.Max(_pathMargin, LevelLayout.DefaultPathMargin);
+        public float PathMargin => LevelLayout.ResolveConveyorPathMargin(_config);
 
         public IReadOnlyList<CollectorUnit> ActiveUnits => _activeUnits;
 
@@ -122,8 +122,8 @@ namespace PixelFlowClone.Managers
         }
 
         /// <summary>
-        /// Binds level path metadata and caches the authored scene waypoints.
-        /// Conveyor / camera stay fixed — the block grid fits inside the playfield frame instead.
+        /// Binds level path metadata and rebuilds waypoints around the fixed playfield
+        /// using <see cref="GameConfigSO.ConveyorPathMargin"/>.
         /// </summary>
         public void ConfigureFromLevel(LevelDataSO level, Transform pathRoot, GameConfigSO config)
         {
@@ -134,10 +134,19 @@ namespace PixelFlowClone.Managers
             if (level != null)
                 _pathData = level.PathReference;
 
-            CacheWaypoints();
+            if (GridManager.HasInstance)
+            {
+                RebuildPathAroundPlayfield(
+                    GridManager.Instance.GridCenterWorld,
+                    GridManager.Instance.PlayfieldSize,
+                    PathMargin);
+            }
+            else
+            {
+                CacheWaypoints();
+            }
 
             float configured = _config != null ? _config.RaycastDistance : 20f;
-            // Cover from path rim to past playfield center (fixed scene layout).
             float playfieldReach = 8f;
             if (GridManager.HasInstance)
             {
@@ -147,12 +156,34 @@ namespace PixelFlowClone.Managers
 
             _effectiveRaycastDistance = Mathf.Max(configured, playfieldReach);
             Debug.Log(
-                $"[ConveyorPathManager] Bound level path metadata (fixed scene waypoints); " +
+                $"[ConveyorPathManager] Path rebuilt around playfield; margin={PathMargin:0.##}, " +
                 $"raycast={_effectiveRaycastDistance:0.##}");
         }
 
         /// <summary>
-        /// Moves (or creates) the 8 loop waypoints to frame the level grid.
+        /// Moves (or creates) the 8 loop waypoints around the fixed playfield frame.
+        /// </summary>
+        public void RebuildPathAroundPlayfield(
+            Vector2 playfieldCenter,
+            Vector2 playfieldSize,
+            float pathMargin)
+        {
+            if (_pathRoot == null)
+            {
+                var go = new GameObject("ConveyorPath");
+                _pathRoot = go.transform;
+            }
+
+            IReadOnlyList<Vector2> positions = LevelLayout.ComputeConveyorLoopPositionsForPlayfield(
+                playfieldCenter,
+                playfieldSize,
+                pathMargin);
+            ApplyWaypointPositions(positions);
+            CacheWaypoints();
+        }
+
+        /// <summary>
+        /// Moves (or creates) the 8 loop waypoints to frame the level grid (SO-space).
         /// </summary>
         public void RebuildPathAroundLevel(LevelDataSO level)
         {
@@ -168,6 +199,12 @@ namespace PixelFlowClone.Managers
             IReadOnlyList<Vector2> positions = LevelLayout.ComputeConveyorLoopPositions(
                 level,
                 Mathf.Max(_pathMargin, LevelLayout.DefaultPathMargin));
+            ApplyWaypointPositions(positions);
+            CacheWaypoints();
+        }
+
+        private void ApplyWaypointPositions(IReadOnlyList<Vector2> positions)
+        {
             ConveyorWaypoint[] existing = _pathRoot.GetComponentsInChildren<ConveyorWaypoint>(true)
                 .OrderBy(w => w.Index)
                 .ToArray();
@@ -189,19 +226,13 @@ namespace PixelFlowClone.Managers
 
                 waypoint.transform.position = new Vector3(positions[i].x, positions[i].y, 0f);
                 SetWaypointIndex(waypoint, i);
+                waypoint.gameObject.SetActive(true);
             }
 
-            // Hide extras if a larger custom path was authored.
             for (int i = positions.Count; i < existing.Length; i++)
             {
                 if (existing[i] != null)
                     existing[i].gameObject.SetActive(false);
-            }
-
-            for (int i = 0; i < Mathf.Min(positions.Count, existing.Length); i++)
-            {
-                if (existing[i] != null)
-                    existing[i].gameObject.SetActive(true);
             }
         }
 

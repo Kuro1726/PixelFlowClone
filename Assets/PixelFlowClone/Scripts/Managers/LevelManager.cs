@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.UI.Screens;
+using PixelFlowClone.Utils;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -303,6 +304,11 @@ namespace PixelFlowClone.Managers
             context.Grid?.SpawnGrid(CurrentLevel);
             context.Queue?.LoadLevel(CurrentLevel);
 
+            FitGameplayCamera(CurrentLevel);
+
+            if (context.Hud != null)
+                context.Hud.SetLevelIndex(CurrentLevelIndex);
+
             if (GameManager.HasInstance &&
                 GameManager.Instance.CurrentState == GameState.Loading)
             {
@@ -310,6 +316,34 @@ namespace PixelFlowClone.Managers
             }
 
             return true;
+        }
+
+        private static void FitGameplayCamera(LevelDataSO level)
+        {
+            Camera camera = Camera.main;
+            if (camera == null || level == null)
+                return;
+
+            GameConfigSO config = null;
+            if (GameplayContext.Instance != null && GameplayContext.Instance.Conveyor != null)
+                config = GameplayContext.Instance.Conveyor.Config;
+
+            if (GridManager.HasInstance)
+            {
+                float waitingY = LevelLayout.GetWaitingStackWorldPosition(level).y;
+                if (QueueManager.HasInstance && QueueManager.Instance.Waiting != null)
+                    waitingY = QueueManager.Instance.Waiting.StackAnchorWorld.y;
+
+                LevelLayout.FitCameraToPlayfield(
+                    camera,
+                    GridManager.Instance.GridCenterWorld,
+                    GridManager.Instance.PlayfieldSize,
+                    waitingY,
+                    config);
+                return;
+            }
+
+            LevelLayout.FitCameraToLevel(camera, level);
         }
 
 #if UNITY_EDITOR

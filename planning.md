@@ -95,6 +95,7 @@ Assets/
     │   ├── Data/
     │   │   ├── LevelDataSO.cs
     │   │   ├── GameConfigSO.cs
+    │   │   ├── GameSettings.cs
     │   │   ├── ColorId.cs
     │   │   └── CollectorSpawnEntry.cs
     │   ├── UI/
@@ -103,6 +104,7 @@ Assets/
     │   │   │   ├── MainMenuScreen.cs
     │   │   │   └── GameplayHUD.cs
     │   │   └── Popups/
+    │   │       ├── SettingsPopup.cs
     │   │       ├── VictoryPopup.cs
     │   │       ├── DefeatPopup.cs
     │   │       └── PausePopup.cs
@@ -904,8 +906,8 @@ public static class DeadlockDetector
 | 3.3 | `LoadingScreen` | Game title + progress bar + `"Loading..."` | English strings |
 | 3.4 | `MainMenuScreen` | Buttons: Play → level pick, Instructions, Settings | Play mở chọn level |
 | 3.5 | Level Select grid | Unlock theo `PlayerPrefs`, hiển thị `"Level {0}"` | Key: `PFC_HighestUnlockedLevel`; mở từ Play |
-| 3.6 | Settings popup | Audio ON/OFF, Haptic ON/OFF | `PlayerPrefs` keys |
-| 3.7 | `SCN_Gameplay` integration | `GameplayContext` prefab in scene | |
+| 3.6 | Settings popup | Audio ON/OFF, Haptic ON/OFF | Keys: `PFC_AudioEnabled`, `PFC_HapticEnabled` |
+| 3.7 | `SCN_Gameplay` integration | `GameplayContext` prefab + HUD in scene | `PF_GameplayContext` + `PF_GameplayHUD` |
 | 3.8 | `GameplayHUD` — top bar | Pause button, `"Level {0}"` label | |
 | 3.9 | `GameplayHUD` — center | Conveyor `"X/5"` indicator | Subscribe `OnConveyorCountChanged` |
 | 3.10 | `GameplayHUD` — bottom | Queue `"Y/5"` + waiting stack visual | Subscribe `OnQueueCountChanged` |
@@ -1069,8 +1071,8 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P3-04** Tạo `SCN_MainMenu.unity` + `MainMenuScreen.cs`
 - [x] **P3-05** Implement nút `"Play"` → chọn level rồi load từ `LevelManager`
 - [x] **P3-06** Level Select grid `"Level {0}"` + unlock `PlayerPrefs` (`PFC_HighestUnlockedLevel`)
-- [ ] **P3-07** Implement Settings: Audio toggle, Haptic toggle → `PlayerPrefs`
-- [ ] **P3-08** Hoàn thiện `SCN_Gameplay.unity` với `PF_GameplayContext` + HUD
+- [x] **P3-07** Implement Settings: Audio toggle, Haptic toggle → `PlayerPrefs`
+- [x] **P3-08** Hoàn thiện `SCN_Gameplay.unity` với `PF_GameplayContext` + HUD
 - [ ] **P3-09** Implement `GameplayHUD` top bar: Pause + `"Level {0}"`
 - [ ] **P3-10** Implement `GameplayHUD` conveyor indicator: `"{0}/{1}"` subscribe `OnConveyorCountChanged`
 - [ ] **P3-11** Implement `GameplayHUD` queue indicator: `"{0}/{1}"` subscribe `OnQueueCountChanged`

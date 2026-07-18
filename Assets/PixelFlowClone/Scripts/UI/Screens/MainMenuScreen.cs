@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using PixelFlowClone.Data;
 using PixelFlowClone.Managers;
+using PixelFlowClone.UI.Popups;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -24,6 +25,7 @@ namespace PixelFlowClone.UI.Screens
         [SerializeField] private Button _backButton;
         [SerializeField] private RectTransform _mainButtonsRoot;
         [SerializeField] private RectTransform _levelSelectRoot;
+        [SerializeField] private SettingsPopup _settingsPopup;
         [SerializeField] private string _title = DefaultTitle;
 
         public event Action PlayClicked;
@@ -39,6 +41,8 @@ namespace PixelFlowClone.UI.Screens
 
             if (_playButton == null || _instructionsButton == null || _settingsButton == null)
                 BuildRuntimeUi();
+
+            EnsureSettingsPopup();
 
             if (_titleText != null)
                 _titleText.text = _title;
@@ -122,8 +126,9 @@ namespace PixelFlowClone.UI.Screens
 
         private void HandleSettingsClicked()
         {
-            Debug.Log("[MainMenu] Settings clicked (P3-07)");
+            Debug.Log("[MainMenu] Settings clicked");
             SettingsClicked?.Invoke();
+            ShowSettings();
         }
 
         private void HandleLevelButtonClicked(int index)
@@ -149,6 +154,8 @@ namespace PixelFlowClone.UI.Screens
                 _mainButtonsRoot.gameObject.SetActive(true);
             if (_levelSelectRoot != null)
                 _levelSelectRoot.gameObject.SetActive(false);
+            if (_settingsPopup != null)
+                _settingsPopup.Hide();
             if (_titleText != null)
                 _titleText.text = _title;
         }
@@ -160,8 +167,43 @@ namespace PixelFlowClone.UI.Screens
                 _mainButtonsRoot.gameObject.SetActive(false);
             if (_levelSelectRoot != null)
                 _levelSelectRoot.gameObject.SetActive(true);
+            if (_settingsPopup != null)
+                _settingsPopup.Hide();
             if (_titleText != null)
                 _titleText.text = "Select Level";
+        }
+
+        private void ShowSettings()
+        {
+            EnsureSettingsPopup();
+            if (_settingsPopup == null)
+                return;
+
+            if (_levelSelectRoot != null)
+                _levelSelectRoot.gameObject.SetActive(false);
+            if (_mainButtonsRoot != null)
+                _mainButtonsRoot.gameObject.SetActive(true);
+            if (_titleText != null)
+                _titleText.text = _title;
+
+            _settingsPopup.Show();
+        }
+
+        private void EnsureSettingsPopup()
+        {
+            if (_settingsPopup != null)
+            {
+                _settingsPopup.Hide();
+                return;
+            }
+
+            Transform canvasRoot = transform;
+            Canvas canvas = GetComponentInChildren<Canvas>();
+            if (canvas != null)
+                canvasRoot = canvas.transform;
+
+            _settingsPopup = SettingsPopup.CreateRuntime(canvasRoot);
+            _settingsPopup.Hide();
         }
 
         private void RebuildLevelButtons()
@@ -321,6 +363,8 @@ namespace PixelFlowClone.UI.Screens
 
             _backButton = CreateMenuButton(
                 _levelSelectRoot, "BackButton", "Back", new Vector2(0.2f, 0.12f), new Vector2(0.8f, 0.20f));
+
+            EnsureSettingsPopup();
         }
 
         private static Button CreateMenuButton(

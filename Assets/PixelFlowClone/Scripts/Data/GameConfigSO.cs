@@ -35,6 +35,64 @@ namespace PixelFlowClone.Data
         public int CollectorPoolPrewarm = 20;
         public int BlockPoolPrewarm = 100;
 
+        [Header("Layout (Queue / Waiting)")]
+        [Tooltip("Khoảng từ mép khung block (playfield) ra ConveyorPath. Tăng = path rộng hơn / bớt bó block.")]
+        [Min(0.25f)]
+        public float ConveyorPathMargin = 1.5f;
+
+        [Tooltip("Khoảng từ đáy conveyor xuống hàng queue (world units).")]
+        [Min(0.01f)]
+        public float QueueGapBelowPath = 0.9f;
+
+        [Tooltip("Khoảng từ hàng queue xuống waiting front (world units).")]
+        [Min(0.01f)]
+        public float WaitingGapBelowQueue = 1.25f;
+
+        [Tooltip("Khoảng cách giữa các CollectorUnit trên hàng queue.")]
+        [Min(0.01f)]
+        public float QueueUnitSpacing = 1.5f;
+
+        [Tooltip("Khoảng cách giữa các CollectorUnit trong 1 cột waiting (dọc).")]
+        [Min(0.01f)]
+        public float WaitingUnitSpacing = 1.5f;
+
+        [Tooltip("Khoảng cách giữa các cột waiting (ngang).")]
+        [Min(0.01f)]
+        public float WaitingColumnSpacing = 1.5f;
+
+        [Header("Camera Framing (Game View)")]
+        [Tooltip("1 = mặc định. >1 phóng to gameplay. <1 thu nhỏ (nhìn xa hơn).")]
+        [Min(0.5f)]
+        public float GameplayScreenScale = 1f;
+
+        [Tooltip("World units phía trên conveyor để Capacity + HUD không che nhau. Tăng nếu Capacity bị khuất.")]
+        [Min(0f)]
+        public float CameraTopPad = 1.45f;
+
+        [Tooltip("World units phía dưới waiting front (độ sâu stack). Tăng nếu unit dưới bị cắt.")]
+        [Min(0.5f)]
+        public float CameraWaitingStackDepth = 4.75f;
+
+        [Tooltip("Padding quanh khung camera (world units).")]
+        [Min(0f)]
+        public float CameraPadding = 0.35f;
+
+        [Tooltip("Phần màn hình dành cho HUD (0.08–0.12). Tăng nếu Capacity dính vào thanh Pause.")]
+        [Range(0.04f, 0.18f)]
+        public float CameraHudScreenFraction = 0.1f;
+
+        [Tooltip("Dương = hạ playfield xuống trên màn hình. Âm = kéo lên. Đơn vị world.")]
+        public float CameraVerticalBias = 0.35f;
+
+        [Header("Gameplay HUD")]
+        [Tooltip("Chiều cao thanh HUD (tỷ lệ chiều cao màn hình).")]
+        [Range(0.04f, 0.14f)]
+        public float HudBarHeight = 0.08f;
+
+        [Tooltip("Cỡ chữ Pause / 5/5 / Level.")]
+        [Range(18f, 48f)]
+        public float HudFontSize = 32f;
+
         private void OnEnable()
         {
             if (PixelBlockLayer.value == 0)

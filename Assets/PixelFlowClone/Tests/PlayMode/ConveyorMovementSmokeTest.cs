@@ -2,6 +2,7 @@ using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.Entities;
 using PixelFlowClone.Managers;
+using PixelFlowClone.Utils;
 using UnityEngine;
 
 /// <summary>
@@ -67,6 +68,18 @@ public class ConveyorMovementSmokeTest : MonoBehaviour
         PoolManager.Instance.Prewarm(_level, _config);
         QueueManager.Instance.LoadLevel(_level);
         GridManager.Instance.SpawnGrid(_level);
+        if (Camera.main != null && GridManager.HasInstance)
+        {
+            float waitingY = QueueManager.Instance.Waiting != null
+                ? QueueManager.Instance.Waiting.StackAnchorWorld.y
+                : LevelLayout.GetWaitingStackWorldPosition(_level).y;
+            LevelLayout.FitCameraToPlayfield(
+                Camera.main,
+                GridManager.Instance.GridCenterWorld,
+                GridManager.Instance.PlayfieldSize,
+                waitingY,
+                _config);
+        }
         Debug.Log(
             $"[SmokeTest] Spawned grid RemainingBlocks={GridManager.Instance.RemainingBlocks}, " +
             $"waiting={QueueManager.Instance.Waiting?.Count ?? 0}. " +

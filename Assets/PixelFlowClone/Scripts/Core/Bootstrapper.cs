@@ -28,6 +28,8 @@ namespace PixelFlowClone.Core
         {
             // Only create missing shells here. PoolManager must live in the scene with prefabs.
             // Readiness is evaluated in Start so scene singleton Awakes have already run.
+            GameSettings.Apply();
+
             PersistentManagers.EnsureGameManager();
             PersistentManagers.EnsureLevelManager(_levels);
 

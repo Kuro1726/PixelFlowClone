@@ -51,6 +51,16 @@ namespace PixelFlowClone.Queue
 
         public int ColumnCount => Mathf.Max(1, _columnCount);
 
+        /// <summary>World position of the waiting stack front row anchor.</summary>
+        public Vector2 StackAnchorWorld
+        {
+            get
+            {
+                EnsureStackRoot();
+                return _stackRoot != null ? (Vector2)_stackRoot.position : (Vector2)transform.position;
+            }
+        }
+
         /// <summary>Front of column 0 (primary). Prefer <see cref="IsFront"/> for tap checks.</summary>
         public CollectorUnit Front
         {
@@ -80,21 +90,42 @@ namespace PixelFlowClone.Queue
         }
 
         /// <summary>
-        /// Applies per-level unit spacing only. Waiting transform stays where authored in the scene.
+        /// Applies per-level spacing and moves the waiting front to
+        /// <see cref="LevelLayout.GetPlayfieldWaitingWorldPosition"/> when a GridManager playfield exists.
         /// </summary>
-        public void AnchorToLevel(LevelDataSO level, float pathMargin = LevelLayout.DefaultPathMargin)
+        public void AnchorToLevel(LevelDataSO level, float pathMargin = -1f)
         {
             if (level == null)
                 return;
 
             EnsureStackRoot();
-            ApplySpacingFromLevel(level);
+            GameConfigSO config = ResolveConfig();
+            ApplySpacingFromLevel(level, config);
+
+            if (!GridManager.HasInstance)
+                return;
+
+            float margin = pathMargin > 0.01f
+                ? pathMargin
+                : LevelLayout.ResolveConveyorPathMargin(config);
+
+            Vector2 target = LevelLayout.GetPlayfieldWaitingWorldPosition(
+                GridManager.Instance.GridCenterWorld,
+                GridManager.Instance.PlayfieldSize,
+                level,
+                margin,
+                config);
+
+            // Front row sits on stack root; clear leftover scene local offset.
+            _stackRoot.localPosition = Vector3.zero;
+            transform.position = new Vector3(target.x, target.y, transform.position.z);
+            RefreshLayout();
         }
 
         /// <summary>
-        /// Applies waiting unit/column spacing from the level (≤0 keeps scene defaults).
+        /// Applies waiting unit/column spacing from GameConfig (Level SO >0 overrides).
         /// </summary>
-        public void ApplySpacingFromLevel(LevelDataSO level)
+        public void ApplySpacingFromLevel(LevelDataSO level, GameConfigSO config = null)
         {
             if (_defaultSlotSpacing < 0f)
             {
@@ -102,12 +133,18 @@ namespace PixelFlowClone.Queue
                 _defaultColumnSpacing = _columnSpacing;
             }
 
-            _slotSpacing = level != null && level.WaitingUnitSpacing > 0.01f
-                ? level.WaitingUnitSpacing
-                : _defaultSlotSpacing;
-            _columnSpacing = level != null && level.WaitingColumnSpacing > 0.01f
-                ? level.WaitingColumnSpacing
-                : _defaultColumnSpacing;
+            if (config == null)
+                config = ResolveConfig();
+
+            _slotSpacing = LevelLayout.ResolveWaitingUnitSpacing(level, config, _defaultSlotSpacing);
+            _columnSpacing = LevelLayout.ResolveWaitingColumnSpacing(level, config, _defaultColumnSpacing);
+        }
+
+        private static GameConfigSO ResolveConfig()
+        {
+            if (ConveyorPathManager.HasInstance)
+                return ConveyorPathManager.Instance.Config;
+            return null;
         }
 
         public void SpawnFromLevel(LevelDataSO level)

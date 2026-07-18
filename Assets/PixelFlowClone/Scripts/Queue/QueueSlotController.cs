@@ -46,28 +46,58 @@ namespace PixelFlowClone.Queue
         public IReadOnlyList<CollectorUnit> Units => _occupants;
 
         /// <summary>
-        /// Applies per-level unit spacing only. Queue transform stays where authored in the scene.
+        /// Applies per-level spacing and moves the queue row to
+        /// <see cref="LevelLayout.GetPlayfieldQueueWorldPosition"/> when a GridManager playfield exists.
         /// </summary>
-        public void AnchorToLevel(LevelDataSO level, float pathMargin = LevelLayout.DefaultPathMargin)
+        public void AnchorToLevel(LevelDataSO level, float pathMargin = -1f)
         {
             if (level == null)
                 return;
 
             EnsureInitialized();
-            ApplySpacingFromLevel(level);
+            GameConfigSO config = ResolveConfig();
+            ApplySpacingFromLevel(level, config);
             EnsureAnchors();
+
+            if (GridManager.HasInstance)
+            {
+                float margin = pathMargin > 0.01f
+                    ? pathMargin
+                    : LevelLayout.ResolveConveyorPathMargin(config);
+
+                Vector2 target = LevelLayout.GetPlayfieldQueueWorldPosition(
+                    GridManager.Instance.GridCenterWorld,
+                    GridManager.Instance.PlayfieldSize,
+                    level,
+                    margin,
+                    config);
+
+                if (_slotsRoot != null)
+                    _slotsRoot.localPosition = Vector3.zero;
+
+                transform.position = new Vector3(target.x, target.y, transform.position.z);
+            }
+
             RefreshLayout();
         }
 
-        /// <summary>Applies <see cref="LevelDataSO.QueueUnitSpacing"/> (≤0 keeps the scene default).</summary>
-        public void ApplySpacingFromLevel(LevelDataSO level)
+        /// <summary>Applies queue spacing from GameConfig (Level SO >0 overrides).</summary>
+        public void ApplySpacingFromLevel(LevelDataSO level, GameConfigSO config = null)
         {
             if (_defaultSlotSpacing < 0f)
                 _defaultSlotSpacing = _slotSpacing;
 
-            _slotSpacing = level != null && level.QueueUnitSpacing > 0.01f
-                ? level.QueueUnitSpacing
-                : _defaultSlotSpacing;
+            if (config == null)
+                config = ResolveConfig();
+
+            _slotSpacing = LevelLayout.ResolveQueueUnitSpacing(level, config, _defaultSlotSpacing);
+        }
+
+        private static GameConfigSO ResolveConfig()
+        {
+            if (ConveyorPathManager.HasInstance)
+                return ConveyorPathManager.Instance.Config;
+            return null;
         }
 
         public bool IsValidSlot(int slotIndex) => slotIndex >= 0 && slotIndex < _slotCount;

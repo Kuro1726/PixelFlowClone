@@ -232,10 +232,11 @@ namespace PixelFlowClone.Editor
 
         private void DrawLayout()
         {
-            EditorGUILayout.LabelField("Layout (Queue / Waiting)", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Layout (optional overrides)", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "≤0 uses scene defaults (~1.1). Unit Spacing = gap between collectors in the same row/column.",
-                MessageType.None);
+                "Để trống (≤0) → dùng GameConfig → Layout.\n" +
+                ">0 = ghi đè riêng level này.",
+                MessageType.Info);
             EditorGUILayout.PropertyField(_queueGapBelowPath, new GUIContent("Queue Gap Below Path"));
             EditorGUILayout.PropertyField(_waitingGapBelowQueue, new GUIContent("Waiting Gap Below Queue"));
             EditorGUILayout.PropertyField(_queueUnitSpacing, new GUIContent("Queue Unit Spacing"));

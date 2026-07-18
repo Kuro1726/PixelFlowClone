@@ -1,4 +1,5 @@
 using PixelFlowClone.Managers;
+using PixelFlowClone.UI.Screens;
 using UnityEngine;
 
 namespace PixelFlowClone.Core
@@ -13,6 +14,7 @@ namespace PixelFlowClone.Core
         [SerializeField] private ConveyorPathManager _conveyor;
         [SerializeField] private QueueManager _queue;
         [SerializeField] private InputManager _input;
+        [SerializeField] private GameplayHUD _hud;
 
         public static GameplayContext Instance { get; private set; }
 
@@ -20,6 +22,7 @@ namespace PixelFlowClone.Core
         public ConveyorPathManager Conveyor => _conveyor;
         public QueueManager Queue => _queue;
         public InputManager Input => _input;
+        public GameplayHUD Hud => _hud;
 
         private void Awake()
         {
@@ -33,6 +36,7 @@ namespace PixelFlowClone.Core
             ResolveMissingReferences();
             PersistentManagers.EnsureGameManager();
             PersistentManagers.EnsureLevelManager();
+            EnsureHud();
         }
 
         /// <summary>
@@ -42,12 +46,15 @@ namespace PixelFlowClone.Core
             GridManager grid,
             ConveyorPathManager conveyor,
             QueueManager queue,
-            InputManager input)
+            InputManager input,
+            GameplayHUD hud = null)
         {
             _grid = grid;
             _conveyor = conveyor;
             _queue = queue;
             _input = input;
+            if (hud != null)
+                _hud = hud;
         }
 
         private void ResolveMissingReferences()
@@ -60,6 +67,23 @@ namespace PixelFlowClone.Core
                 _queue = GetComponentInChildren<QueueManager>(true);
             if (_input == null)
                 _input = GetComponentInChildren<InputManager>(true);
+            if (_hud == null)
+                _hud = FindFirstObjectByType<GameplayHUD>();
+        }
+
+        private void EnsureHud()
+        {
+            if (_hud == null)
+                _hud = FindFirstObjectByType<GameplayHUD>();
+
+            if (_hud == null)
+            {
+                _hud = GameplayHUD.CreateRuntime();
+                _hud.name = "PF_GameplayHUD";
+                Debug.Log("[GameplayContext] Spawned runtime PF_GameplayHUD (scene had none).");
+            }
+
+            _hud.Show();
         }
 
         private void OnDestroy()

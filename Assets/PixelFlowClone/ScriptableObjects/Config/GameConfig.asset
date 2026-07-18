@@ -17,7 +17,7 @@ MonoBehaviour:
   CollectorMoveSpeed: 4
   LapCompleteEpsilon: 0.05
   EndgameCollectorThreshold: 5
-  EndgameMoveSpeedMultiplier: 2
+  EndgameMoveSpeedMultiplier: 3
   EndgameSkipQueueOnLap: 1
   RaycastDistance: 20
   PixelBlockLayer:
@@ -28,3 +28,17 @@ MonoBehaviour:
   TapCooldownSeconds: 0.15
   CollectorPoolPrewarm: 20
   BlockPoolPrewarm: 100
+  ConveyorPathMargin: 2
+  QueueGapBelowPath: 2
+  WaitingGapBelowQueue: 2
+  QueueUnitSpacing: 1.5
+  WaitingUnitSpacing: 1.5
+  WaitingColumnSpacing: 1.5
+  GameplayScreenScale: 1
+  CameraTopPad: 2
+  CameraWaitingStackDepth: 4.75
+  CameraPadding: 0.35
+  CameraHudScreenFraction: 0.1
+  CameraVerticalBias: 0.35
+  HudBarHeight: 0.08
+  HudFontSize: 32
