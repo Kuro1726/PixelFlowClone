@@ -35,9 +35,16 @@ namespace PixelFlowClone.Entities
         /// </summary>
         public void Initialize(ColorId color, Vector2Int gridPosition, Vector3 worldPosition)
         {
+            Initialize(color, gridPosition, worldPosition, 1f);
+        }
+
+        public void Initialize(ColorId color, Vector2Int gridPosition, Vector3 worldPosition, float uniformScale)
+        {
             Color = color;
             GridPosition = gridPosition;
             transform.position = worldPosition;
+            float s = Mathf.Max(0.01f, uniformScale);
+            transform.localScale = new Vector3(s, s, 1f);
 
             IsConsumed = false;
             if (_collider != null) _collider.enabled = true;
@@ -65,6 +72,7 @@ namespace PixelFlowClone.Entities
             Color = ColorId.None;
             GridPosition = Vector2Int.zero;
             IsConsumed = false;
+            transform.localScale = Vector3.one;
             if (_collider != null) _collider.enabled = true;
         }
     }

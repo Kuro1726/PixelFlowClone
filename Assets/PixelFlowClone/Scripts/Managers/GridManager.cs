@@ -8,18 +8,39 @@ namespace PixelFlowClone.Managers
 {
     /// <summary>
     /// Spawns and tracks the central pixel-block grid from a LevelDataSO.
-    /// Scene-scoped (not DontDestroyOnLoad).
+    /// The playfield frame is fixed in the scene; GridSize only changes cell size/scale
+    /// so blocks always fit inside that frame (inside the authored conveyor loop).
     /// </summary>
     public class GridManager : Singleton<GridManager>
     {
+        [Header("Scene")]
         [SerializeField] private Transform _gridRoot;
+
+        [Header("Fixed Playfield")]
+        [Tooltip("World-space center of the block frame (inside the conveyor loop).")]
+        [SerializeField] private Vector2 _playfieldCenter = Vector2.zero;
+        [Tooltip("World-space size of the block frame. Blocks always fit inside this rect.")]
+        [SerializeField] private Vector2 _playfieldSize = new(5f, 5f);
+        [Tooltip("Prefab block scale 1 corresponds to this cell size (world units).")]
+        [SerializeField] private float _referenceCellSize = 1f;
 
         private readonly Dictionary<Vector2Int, PixelBlock> _blocks = new();
         private LevelDataSO _currentLevel;
+        private Vector2 _runtimeOrigin;
+        private float _runtimeCellSize = 1f;
+        private float _runtimeBlockScale = 1f;
 
         public IReadOnlyDictionary<Vector2Int, PixelBlock> Blocks => _blocks;
 
         public LevelDataSO CurrentLevel => _currentLevel;
+
+        public Vector2 PlayfieldCenter => _playfieldCenter;
+
+        public Vector2 PlayfieldSize => _playfieldSize;
+
+        public float RuntimeCellSize => _runtimeCellSize;
+
+        public Vector2 RuntimeOrigin => _runtimeOrigin;
 
         /// <summary>
         /// Number of unconsumed blocks still tracked on the grid. Used for win checks (== 0).
@@ -27,25 +48,15 @@ namespace PixelFlowClone.Managers
         public int RemainingBlocks => _blocks.Count;
 
         /// <summary>
-        /// World-space center of the current level grid. Used by inward/outward raycasts.
+        /// World-space center of the active playfield (raycast inward target).
         /// </summary>
-        public Vector2 GridCenterWorld
-        {
-            get
-            {
-                if (_currentLevel == null)
-                    return _gridRoot != null ? (Vector2)_gridRoot.position : Vector2.zero;
-
-                LevelDataSO level = _currentLevel;
-                float localX = level.GridOrigin.x + (level.GridSize.x - 1) * level.CellSpacing.x * 0.5f;
-                float localY = level.GridOrigin.y + (level.GridSize.y - 1) * level.CellSpacing.y * 0.5f;
-                return GridLocalToWorld(new Vector3(localX, localY, 0f));
-            }
-        }
+        public Vector2 GridCenterWorld =>
+            _gridRoot != null
+                ? (Vector2)_gridRoot.TransformPoint(_playfieldCenter)
+                : _playfieldCenter;
 
         /// <summary>
-        /// Instantiates one PixelBlock per non-empty cell, positioned in world space
-        /// using GridOrigin + (x * CellSpacing.x, y * CellSpacing.y).
+        /// Instantiates one PixelBlock per non-empty cell, fitted into the fixed playfield frame.
         /// </summary>
         public void SpawnGrid(LevelDataSO level)
         {
@@ -63,8 +74,10 @@ namespace PixelFlowClone.Managers
 
             ClearGrid();
             _currentLevel = level;
-
             EnsureGridRoot();
+            RecalculateRuntimeLayout(level);
+
+            float scale = _runtimeBlockScale;
 
             for (int y = 0; y < level.GridSize.y; y++)
             {
@@ -75,16 +88,20 @@ namespace PixelFlowClone.Managers
                         continue;
 
                     var gridPos = new Vector2Int(x, y);
-                    Vector3 worldPos = GridToWorld(level, gridPos);
+                    Vector3 worldPos = GridToWorld(gridPos);
 
                     PixelBlock block = PoolManager.Instance.GetPixelBlock();
                     block.name = $"PixelBlock_{x}_{y}_i{y * level.GridSize.x + x}_{color}";
                     block.transform.SetParent(_gridRoot, true);
-                    block.Initialize(color, gridPos, worldPos);
+                    block.Initialize(color, gridPos, worldPos, scale);
 
                     _blocks[gridPos] = block;
                 }
             }
+
+            Debug.Log(
+                $"[GridManager] Spawned grid {level.GridSize.x}x{level.GridSize.y} " +
+                $"cell={_runtimeCellSize:0.###} scale={scale:0.###} into playfield {_playfieldSize}");
         }
 
         /// <summary>
@@ -126,12 +143,23 @@ namespace PixelFlowClone.Managers
             return true;
         }
 
-        /// <summary>
-        /// GridOrigin + cell spacing are treated as local to <see cref="_gridRoot"/>.
-        /// Move GridRoot in the scene to shift the whole grid (e.g. match ConveyorPath Y).
-        /// </summary>
+        public Vector3 GridToWorld(Vector2Int gridPos)
+        {
+            Vector2 local = _runtimeOrigin + new Vector2(
+                gridPos.x * _runtimeCellSize,
+                gridPos.y * _runtimeCellSize);
+            return GridLocalToWorld(new Vector3(local.x, local.y, 0f));
+        }
+
+        /// <summary>Legacy helper — prefers runtime playfield layout when a level is active.</summary>
         public Vector3 GridToWorld(LevelDataSO level, Vector2Int gridPos)
         {
+            if (_currentLevel == level && _runtimeCellSize > 0.0001f)
+                return GridToWorld(gridPos);
+
+            if (level == null)
+                return Vector3.zero;
+
             float localX = level.GridOrigin.x + gridPos.x * level.CellSpacing.x;
             float localY = level.GridOrigin.y + gridPos.y * level.CellSpacing.y;
             return GridLocalToWorld(new Vector3(localX, localY, 0f));
@@ -142,6 +170,25 @@ namespace PixelFlowClone.Managers
             float worldX = level.GridOrigin.x + gridPos.x * level.CellSpacing.x;
             float worldY = level.GridOrigin.y + gridPos.y * level.CellSpacing.y;
             return new Vector3(worldX, worldY, 0f);
+        }
+
+        private void RecalculateRuntimeLayout(LevelDataSO level)
+        {
+            int cols = Mathf.Max(1, level.GridSize.x);
+            int rows = Mathf.Max(1, level.GridSize.y);
+            float frameW = Mathf.Max(0.01f, _playfieldSize.x);
+            float frameH = Mathf.Max(0.01f, _playfieldSize.y);
+
+            _runtimeCellSize = Mathf.Min(frameW / cols, frameH / rows);
+            float usedW = cols * _runtimeCellSize;
+            float usedH = rows * _runtimeCellSize;
+
+            // First cell center: bottom-left of the used rect inside the playfield frame.
+            _runtimeOrigin = _playfieldCenter - new Vector2(usedW, usedH) * 0.5f
+                             + new Vector2(_runtimeCellSize, _runtimeCellSize) * 0.5f;
+
+            float reference = Mathf.Max(0.01f, _referenceCellSize);
+            _runtimeBlockScale = _runtimeCellSize / reference;
         }
 
         private Vector3 GridLocalToWorld(Vector3 local)
@@ -156,37 +203,30 @@ namespace PixelFlowClone.Managers
 
         /// <summary>
         /// Discrete lane index along the belt: column X when moving horizontally, row Y when moving vertically.
-        /// One consume ray is fired when this index changes.
         /// </summary>
         public int GetLaneIndex(Vector2 worldPos, bool movingVertically)
         {
-            if (_currentLevel == null)
+            if (_runtimeCellSize < 0.0001f)
                 return 0;
 
             Vector3 local = GridWorldToLocal(worldPos);
-            LevelDataSO level = _currentLevel;
             if (movingVertically)
-            {
-                float spacingY = Mathf.Max(0.01f, level.CellSpacing.y);
-                return Mathf.RoundToInt((local.y - level.GridOrigin.y) / spacingY);
-            }
+                return Mathf.RoundToInt((local.y - _runtimeOrigin.y) / _runtimeCellSize);
 
-            float spacingX = Mathf.Max(0.01f, level.CellSpacing.x);
-            return Mathf.RoundToInt((local.x - level.GridOrigin.x) / spacingX);
+            return Mathf.RoundToInt((local.x - _runtimeOrigin.x) / _runtimeCellSize);
         }
 
         /// <summary>World position used for a lane raycast (snapped to that lane center on the move axis).</summary>
         public Vector2 GetLaneRayOrigin(Vector2 worldPos, int lane, bool movingVertically)
         {
-            if (_currentLevel == null)
-                return worldPos;
-
             Vector3 local = GridWorldToLocal(worldPos);
-            LevelDataSO level = _currentLevel;
-            if (movingVertically)
-                local.y = level.GridOrigin.y + lane * level.CellSpacing.y;
-            else
-                local.x = level.GridOrigin.x + lane * level.CellSpacing.x;
+            if (_runtimeCellSize > 0.0001f)
+            {
+                if (movingVertically)
+                    local.y = _runtimeOrigin.y + lane * _runtimeCellSize;
+                else
+                    local.x = _runtimeOrigin.x + lane * _runtimeCellSize;
+            }
 
             Vector3 world = GridLocalToWorld(local);
             return new Vector2(world.x, world.y);
@@ -200,5 +240,17 @@ namespace PixelFlowClone.Managers
                 _gridRoot.SetParent(transform, false);
             }
         }
+
+#if UNITY_EDITOR
+        private void OnDrawGizmosSelected()
+        {
+            Vector3 center = _gridRoot != null
+                ? _gridRoot.TransformPoint(_playfieldCenter)
+                : (Vector3)_playfieldCenter;
+            Vector3 size = new(_playfieldSize.x, _playfieldSize.y, 0.01f);
+            Gizmos.color = new Color(0.2f, 0.9f, 0.4f, 0.35f);
+            Gizmos.DrawWireCube(center, size);
+        }
+#endif
     }
 }

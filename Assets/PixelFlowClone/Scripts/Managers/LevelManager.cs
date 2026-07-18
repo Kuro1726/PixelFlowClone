@@ -273,7 +273,8 @@ namespace PixelFlowClone.Managers
         }
 
         /// <summary>
-        /// Rebuilds pool capacity, path metadata, grid, and waiting collectors for CurrentLevel.
+        /// Rebuilds pool capacity, binds fixed conveyor metadata, spawns grid into the playfield frame,
+        /// and loads waiting collectors.
         /// </summary>
         public bool ApplyCurrentLevelToGameplay()
         {

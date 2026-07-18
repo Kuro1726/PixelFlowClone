@@ -3,7 +3,6 @@ using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.Entities;
 using PixelFlowClone.Queue;
-using PixelFlowClone.Utils;
 using UnityEngine;
 
 namespace PixelFlowClone.Managers
@@ -49,18 +48,14 @@ namespace PixelFlowClone.Managers
             SpawnWaitingFromLevel(level);
         }
 
-        /// <summary>Repositions waiting stack + queue slots relative to the rebuilt conveyor path.</summary>
+        /// <summary>Applies per-level collector spacing; scene positions stay fixed.</summary>
         public void LayoutForLevel(LevelDataSO level)
         {
             if (level == null)
                 return;
 
-            float pathMargin = ConveyorPathManager.HasInstance
-                ? ConveyorPathManager.Instance.PathMargin
-                : LevelLayout.DefaultPathMargin;
-
-            _queueSlots?.AnchorToLevel(level, pathMargin);
-            _waiting?.AnchorToLevel(level, pathMargin);
+            _queueSlots?.AnchorToLevel(level);
+            _waiting?.AnchorToLevel(level);
         }
 
         /// <summary>Dispatches the primary front waiting unit to the conveyor.</summary>

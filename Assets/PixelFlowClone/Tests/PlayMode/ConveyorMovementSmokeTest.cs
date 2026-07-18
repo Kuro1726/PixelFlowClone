@@ -59,7 +59,7 @@ public class ConveyorMovementSmokeTest : MonoBehaviour
             return;
         }
 
-        // Same path as Bootstrap → Menu → Play (ConfigureFromLevel + camera + queue layout).
+        // Bind authored conveyor path; grid fits into fixed playfield (no path rebuild).
         ConveyorPathManager.Instance.ConfigureFromLevel(
             _level,
             ConveyorPathManager.Instance.PathRoot,

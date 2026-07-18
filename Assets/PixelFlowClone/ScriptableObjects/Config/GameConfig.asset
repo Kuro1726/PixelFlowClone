@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   MaxConveyorUnits: 5
   MaxQueueSlots: 5
-  CollectorMoveSpeed: 10
+  CollectorMoveSpeed: 4
   LapCompleteEpsilon: 0.05
   EndgameCollectorThreshold: 5
   EndgameMoveSpeedMultiplier: 2

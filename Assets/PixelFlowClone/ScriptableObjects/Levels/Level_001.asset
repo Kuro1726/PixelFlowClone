@@ -34,8 +34,8 @@ MonoBehaviour:
     - Color: 2
       InitialCapacity: 40
   QueueGapBelowPath: 3
-  WaitingGapBelowQueue: 1.25
-  QueueUnitSpacing: 3
-  WaitingUnitSpacing: 3
-  WaitingColumnSpacing: 3
+  WaitingGapBelowQueue: 1.5
+  QueueUnitSpacing: 1.5
+  WaitingUnitSpacing: 1.5
+  WaitingColumnSpacing: 1.5
   PathReference: {fileID: 11400000, guid: 2b3c4d5e6f708192a3b4c5d6e7f8091a, type: 2}

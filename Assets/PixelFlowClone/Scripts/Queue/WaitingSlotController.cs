@@ -80,7 +80,7 @@ namespace PixelFlowClone.Queue
         }
 
         /// <summary>
-        /// Places the waiting stack just below the conveyor path for the given level grid.
+        /// Applies per-level unit spacing only. Waiting transform stays where authored in the scene.
         /// </summary>
         public void AnchorToLevel(LevelDataSO level, float pathMargin = LevelLayout.DefaultPathMargin)
         {
@@ -89,9 +89,6 @@ namespace PixelFlowClone.Queue
 
             EnsureStackRoot();
             ApplySpacingFromLevel(level);
-            Vector2 world = LevelLayout.GetWaitingStackWorldPosition(level, pathMargin);
-            transform.position = new Vector3(world.x, world.y, transform.position.z);
-            _stackRoot.localPosition = Vector3.zero;
         }
 
         /// <summary>

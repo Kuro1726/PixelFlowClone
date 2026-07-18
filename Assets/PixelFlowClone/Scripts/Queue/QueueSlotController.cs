@@ -46,7 +46,7 @@ namespace PixelFlowClone.Queue
         public IReadOnlyList<CollectorUnit> Units => _occupants;
 
         /// <summary>
-        /// Places the queue row below the conveyor and applies per-level unit spacing.
+        /// Applies per-level unit spacing only. Queue transform stays where authored in the scene.
         /// </summary>
         public void AnchorToLevel(LevelDataSO level, float pathMargin = LevelLayout.DefaultPathMargin)
         {
@@ -55,10 +55,6 @@ namespace PixelFlowClone.Queue
 
             EnsureInitialized();
             ApplySpacingFromLevel(level);
-            Vector2 world = LevelLayout.GetQueueSlotsWorldPosition(level, pathMargin);
-            transform.position = new Vector3(world.x, world.y, transform.position.z);
-            if (_slotsRoot != null)
-                _slotsRoot.localPosition = Vector3.zero;
             EnsureAnchors();
             RefreshLayout();
         }

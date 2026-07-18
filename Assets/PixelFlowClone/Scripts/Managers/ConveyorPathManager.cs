@@ -121,6 +121,10 @@ namespace PixelFlowClone.Managers
             CacheWaypoints();
         }
 
+        /// <summary>
+        /// Binds level path metadata and caches the authored scene waypoints.
+        /// Conveyor / camera stay fixed — the block grid fits inside the playfield frame instead.
+        /// </summary>
         public void ConfigureFromLevel(LevelDataSO level, Transform pathRoot, GameConfigSO config)
         {
             if (pathRoot != null)
@@ -130,20 +134,21 @@ namespace PixelFlowClone.Managers
             if (level != null)
                 _pathData = level.PathReference;
 
-            RebuildPathAroundLevel(level);
             CacheWaypoints();
 
-            if (level != null)
+            float configured = _config != null ? _config.RaycastDistance : 20f;
+            // Cover from path rim to past playfield center (fixed scene layout).
+            float playfieldReach = 8f;
+            if (GridManager.HasInstance)
             {
-                float margin = Mathf.Max(_pathMargin, LevelLayout.DefaultPathMargin);
-                float recommended = LevelLayout.RecommendedRaycastDistance(level, margin);
-                float configured = _config != null ? _config.RaycastDistance : recommended;
-                _effectiveRaycastDistance = Mathf.Max(configured, recommended);
-                LevelLayout.FitCameraToLevel(Camera.main, level, margin);
-                Debug.Log(
-                    $"[ConveyorPathManager] Path rebuilt for grid {level.GridSize.x}x{level.GridSize.y}; " +
-                    $"raycast={_effectiveRaycastDistance:0.##}");
+                Vector2 size = GridManager.Instance.PlayfieldSize;
+                playfieldReach = Mathf.Max(size.x, size.y) * 0.5f + PathMargin + 1f;
             }
+
+            _effectiveRaycastDistance = Mathf.Max(configured, playfieldReach);
+            Debug.Log(
+                $"[ConveyorPathManager] Bound level path metadata (fixed scene waypoints); " +
+                $"raycast={_effectiveRaycastDistance:0.##}");
         }
 
         /// <summary>
