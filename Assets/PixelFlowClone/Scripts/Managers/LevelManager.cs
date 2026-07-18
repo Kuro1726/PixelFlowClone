@@ -5,6 +5,7 @@ using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.UI.Screens;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace PixelFlowClone.Managers
 {
@@ -14,6 +15,7 @@ namespace PixelFlowClone.Managers
     public class LevelManager : Singleton<LevelManager>
     {
         public const string CurrentLevelPrefsKey = "PFC_CurrentLevel";
+        public const string HighestUnlockedPrefsKey = "PFC_HighestUnlockedLevel";
 
         [SerializeField] private LevelDataSO[] _levels;
         [SerializeField] private bool _loadSavedLevelOnStart = true;
@@ -21,31 +23,104 @@ namespace PixelFlowClone.Managers
 
         private Coroutine _playRoutine;
 
+        /// <summary>
+        /// Runtime override from Bootstrapper. Kept separate from <see cref="_levels"/> so the
+        /// Inspector ListView is not invalidated when levels are configured during Play Mode.
+        /// </summary>
+        private LevelDataSO[] _activeLevels;
+
         public int CurrentLevelIndex { get; private set; }
         public LevelDataSO CurrentLevel { get; private set; }
-        public IReadOnlyList<LevelDataSO> Levels => _levels ?? Array.Empty<LevelDataSO>();
+        public int HighestUnlockedLevelIndex { get; private set; }
+        public IReadOnlyList<LevelDataSO> Levels => GetLevels();
         public bool IsLoadingGameplay => _playRoutine != null;
 
         public event Action<LevelDataSO, int> LevelLoaded;
 
         public void ConfigureLevels(params LevelDataSO[] levels)
         {
-            _levels = levels ?? Array.Empty<LevelDataSO>();
+            // Do not assign to serialized _levels while playing — Unity's UI Toolkit ListView
+            // throws ObjectDisposedException when Array.data[i] bindings disappear mid-frame.
+            _activeLevels = levels != null && levels.Length > 0 ? levels : null;
+        }
+
+        private LevelDataSO[] GetLevels()
+        {
+            if (_activeLevels != null && _activeLevels.Length > 0)
+                return _activeLevels;
+            return _levels ?? Array.Empty<LevelDataSO>();
         }
 
         protected override void OnSingletonAwake()
         {
             MakePersistent();
             CurrentLevelIndex = Mathf.Max(0, PlayerPrefs.GetInt(CurrentLevelPrefsKey, 0));
+            HighestUnlockedLevelIndex = Mathf.Max(0, PlayerPrefs.GetInt(HighestUnlockedPrefsKey, 0));
+        }
+
+        private void OnEnable()
+        {
+            GameEvents.OnVictory -= HandleVictory;
+            GameEvents.OnVictory += HandleVictory;
+        }
+
+        private void OnDisable()
+        {
+            GameEvents.OnVictory -= HandleVictory;
         }
 
         private void Start()
         {
-            if (!_loadSavedLevelOnStart || _levels == null || _levels.Length == 0)
+            LevelDataSO[] levels = GetLevels();
+            if (!_loadSavedLevelOnStart || levels.Length == 0)
                 return;
 
-            int savedIndex = Mathf.Clamp(CurrentLevelIndex, 0, _levels.Length - 1);
+            int savedIndex = Mathf.Clamp(CurrentLevelIndex, 0, levels.Length - 1);
             LoadLevel(savedIndex);
+        }
+
+        public bool IsLevelUnlocked(int index)
+        {
+            return index >= 0 && index <= HighestUnlockedLevelIndex;
+        }
+
+        /// <summary>
+        /// Ensures levels up to <paramref name="index"/> are playable (inclusive).
+        /// </summary>
+        public void UnlockUpTo(int index)
+        {
+            if (index < 0)
+                return;
+
+            LevelDataSO[] levels = GetLevels();
+            if (levels.Length > 0)
+                index = Mathf.Min(index, levels.Length - 1);
+
+            if (index <= HighestUnlockedLevelIndex)
+                return;
+
+            HighestUnlockedLevelIndex = index;
+            PlayerPrefs.SetInt(HighestUnlockedPrefsKey, HighestUnlockedLevelIndex);
+            PlayerPrefs.Save();
+            Debug.Log($"[LevelManager] Unlocked up to level index={HighestUnlockedLevelIndex}");
+        }
+
+        /// <summary>
+        /// After clearing the current level, unlocks the next one (if any).
+        /// </summary>
+        public void UnlockNextLevel()
+        {
+            LevelDataSO[] levels = GetLevels();
+            if (levels.Length == 0)
+                return;
+
+            int next = Mathf.Min(CurrentLevelIndex + 1, levels.Length - 1);
+            UnlockUpTo(next);
+        }
+
+        private void HandleVictory()
+        {
+            UnlockNextLevel();
         }
 
         /// <summary>
@@ -59,15 +134,22 @@ namespace PixelFlowClone.Managers
                 return;
             }
 
-            if (_levels == null || _levels.Length == 0)
+            LevelDataSO[] levels = GetLevels();
+            if (levels.Length == 0)
             {
                 Debug.LogWarning("[LevelManager] No levels are assigned.");
                 return;
             }
 
-            if (index < 0 || index >= _levels.Length)
+            if (index < 0 || index >= levels.Length)
             {
                 Debug.LogWarning($"[LevelManager] Invalid level index {index}.");
+                return;
+            }
+
+            if (!IsLevelUnlocked(index))
+            {
+                Debug.LogWarning($"[LevelManager] Level index={index} is locked.");
                 return;
             }
 
@@ -80,25 +162,27 @@ namespace PixelFlowClone.Managers
         /// </summary>
         public void PlayCurrentLevel()
         {
-            if (_levels == null || _levels.Length == 0)
+            LevelDataSO[] levels = GetLevels();
+            if (levels.Length == 0)
             {
                 Debug.LogWarning("[LevelManager] No levels are assigned.");
                 return;
             }
 
-            PlayLevel(Mathf.Clamp(CurrentLevelIndex, 0, _levels.Length - 1));
+            PlayLevel(Mathf.Clamp(CurrentLevelIndex, 0, levels.Length - 1));
         }
 
         private IEnumerator PlayCurrentLevelRoutine()
         {
-            if (_levels == null || _levels.Length == 0)
+            LevelDataSO[] levels = GetLevels();
+            if (levels.Length == 0)
             {
                 Debug.LogWarning("[LevelManager] No levels are assigned.");
                 _playRoutine = null;
                 yield break;
             }
 
-            int index = Mathf.Clamp(CurrentLevelIndex, 0, _levels.Length - 1);
+            int index = Mathf.Clamp(CurrentLevelIndex, 0, levels.Length - 1);
             if (!LoadLevel(index))
             {
                 _playRoutine = null;
@@ -118,6 +202,9 @@ namespace PixelFlowClone.Managers
                 $"[LevelManager] Play level index={index}, id={CurrentLevel.LevelId} → " +
                 $"{SceneLoader.GameplaySceneName}");
 
+#if UNITY_EDITOR
+            ClearEditorSelectionInActiveScene();
+#endif
             yield return SceneLoader.LoadAsync(
                 SceneLoader.GameplaySceneName,
                 loading.SetProgress,
@@ -136,19 +223,20 @@ namespace PixelFlowClone.Managers
         /// </summary>
         public bool LoadLevel(int index)
         {
-            if (_levels == null || _levels.Length == 0)
+            LevelDataSO[] levels = GetLevels();
+            if (levels.Length == 0)
             {
                 Debug.LogWarning("[LevelManager] No levels are assigned.");
                 return false;
             }
 
-            if (index < 0 || index >= _levels.Length)
+            if (index < 0 || index >= levels.Length)
             {
                 Debug.LogWarning($"[LevelManager] Invalid level index {index}.");
                 return false;
             }
 
-            LevelDataSO level = _levels[index];
+            LevelDataSO level = levels[index];
             if (level == null)
             {
                 Debug.LogWarning($"[LevelManager] Level at index {index} is null.");
@@ -176,10 +264,11 @@ namespace PixelFlowClone.Managers
 
         public bool LoadNextLevel()
         {
-            if (_levels == null || _levels.Length == 0)
+            LevelDataSO[] levels = GetLevels();
+            if (levels.Length == 0)
                 return false;
 
-            int next = Mathf.Min(CurrentLevelIndex + 1, _levels.Length - 1);
+            int next = Mathf.Min(CurrentLevelIndex + 1, levels.Length - 1);
             return LoadLevel(next);
         }
 
@@ -223,6 +312,20 @@ namespace PixelFlowClone.Managers
         }
 
 #if UNITY_EDITOR
+        /// <summary>
+        /// Avoids UI Toolkit ListView binding to SerializedProperties on a GameObject about to be destroyed.
+        /// </summary>
+        private static void ClearEditorSelectionInActiveScene()
+        {
+            GameObject selected = UnityEditor.Selection.activeGameObject;
+            if (selected == null)
+                return;
+
+            Scene active = SceneManager.GetActiveScene();
+            if (selected.scene == active)
+                UnityEditor.Selection.activeObject = null;
+        }
+
         [ContextMenu("Debug/Load Level 0")]
         private void DebugLoadLevel0() => LoadLevel(0);
 
@@ -234,6 +337,24 @@ namespace PixelFlowClone.Managers
 
         [ContextMenu("Debug/Play Current Level")]
         private void DebugPlayCurrentLevel() => PlayCurrentLevel();
+
+        [ContextMenu("Debug/Unlock All Levels")]
+        private void DebugUnlockAllLevels()
+        {
+            LevelDataSO[] levels = GetLevels();
+            if (levels.Length == 0)
+                return;
+            UnlockUpTo(levels.Length - 1);
+        }
+
+        [ContextMenu("Debug/Reset Unlock Progress")]
+        private void DebugResetUnlockProgress()
+        {
+            HighestUnlockedLevelIndex = 0;
+            PlayerPrefs.SetInt(HighestUnlockedPrefsKey, 0);
+            PlayerPrefs.Save();
+            Debug.Log("[LevelManager] Unlock progress reset to level 0 only.");
+        }
 #endif
     }
 }

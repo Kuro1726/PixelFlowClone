@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using PixelFlowClone.Conveyor;
 using PixelFlowClone.Data;
 using PixelFlowClone.Managers;
+using PixelFlowClone.Utils;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -18,7 +19,6 @@ namespace PixelFlowClone.Editor
         private const string ScenePath = "Assets/PixelFlowClone/Scenes/SCN_Gameplay.unity";
         private const string LevelPath = "Assets/PixelFlowClone/ScriptableObjects/Levels/Level_001.asset";
         private const string ConfigPath = "Assets/PixelFlowClone/ScriptableObjects/Config/GameConfig.asset";
-        private const float PathMargin = 1.5f;
 
         [MenuItem("PixelFlowClone/Build Gameplay Scene")]
         public static void BuildGameplayScene()
@@ -44,7 +44,7 @@ namespace PixelFlowClone.Editor
             }
 
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
-            ConfigureCamera();
+            ConfigureCamera(level);
             Transform pathRoot = BuildConveyorPath(level);
             WireConveyorPathManager(pathRoot, level);
 
@@ -59,22 +59,20 @@ namespace PixelFlowClone.Editor
                 AssetDatabase.CreateFolder("Assets/PixelFlowClone", "Scenes");
         }
 
-        private static void ConfigureCamera()
+        private static void ConfigureCamera(LevelDataSO level)
         {
             var camera = Camera.main;
             if (camera == null)
                 return;
 
-            camera.orthographic = true;
-            camera.orthographicSize = 6f;
-            camera.transform.position = new Vector3(0f, 0f, -10f);
+            LevelLayout.FitCameraToLevel(camera, level);
             camera.backgroundColor = new Color(0.12f, 0.14f, 0.18f);
             camera.clearFlags = CameraClearFlags.SolidColor;
         }
 
         private static Transform BuildConveyorPath(LevelDataSO level)
         {
-            IReadOnlyList<Vector2> positions = ComputeLoopPositions(level);
+            IReadOnlyList<Vector2> positions = LevelLayout.ComputeConveyorLoopPositions(level);
 
             var pathRoot = new GameObject("ConveyorPath");
             for (int i = 0; i < positions.Count; i++)
@@ -84,9 +82,7 @@ namespace PixelFlowClone.Editor
                 go.transform.position = new Vector3(positions[i].x, positions[i].y, 0f);
 
                 var waypoint = go.AddComponent<ConveyorWaypoint>();
-                var so = new SerializedObject(waypoint);
-                so.FindProperty("_index").intValue = i;
-                so.ApplyModifiedPropertiesWithoutUndo();
+                waypoint.SetIndex(i);
             }
 
             return pathRoot.transform;
@@ -105,29 +101,9 @@ namespace PixelFlowClone.Editor
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        /// <summary>
-        /// 8-point rectangle loop clockwise around the level grid (entry at index 0, bottom-left).
-        /// </summary>
         public static IReadOnlyList<Vector2> ComputeLoopPositions(LevelDataSO level)
         {
-            float minX = level.GridOrigin.x - PathMargin;
-            float minY = level.GridOrigin.y - PathMargin;
-            float maxX = level.GridOrigin.x + (level.GridSize.x - 1) * level.CellSpacing.x + PathMargin;
-            float maxY = level.GridOrigin.y + (level.GridSize.y - 1) * level.CellSpacing.y + PathMargin;
-            float midX = (minX + maxX) * 0.5f;
-            float midY = (minY + maxY) * 0.5f;
-
-            return new List<Vector2>
-            {
-                new(minX, minY),   // 0 entry — bottom-left
-                new(midX, minY),   // 1 bottom center
-                new(maxX, minY),   // 2 bottom-right
-                new(maxX, midY),   // 3 right center
-                new(maxX, maxY),   // 4 top-right
-                new(midX, maxY),   // 5 top center
-                new(minX, maxY),   // 6 top-left
-                new(minX, midY)    // 7 left center
-            };
+            return LevelLayout.ComputeConveyorLoopPositions(level);
         }
     }
 }

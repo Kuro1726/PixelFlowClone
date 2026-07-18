@@ -17,6 +17,7 @@ namespace PixelFlowClone.Editor
     {
         private const string ScenePath = "Assets/PixelFlowClone/Scenes/SCN_Bootstrap.unity";
         private const string LevelPath = "Assets/PixelFlowClone/ScriptableObjects/Levels/Level_001.asset";
+        private const string Level002Path = "Assets/PixelFlowClone/ScriptableObjects/Levels/Level_002.asset";
         private const string CollectorPrefabPath = "Assets/PixelFlowClone/Prefabs/Entities/PF_CollectorUnit.prefab";
         private const string BlockPrefabPath = "Assets/PixelFlowClone/Prefabs/Entities/PF_PixelBlock.prefab";
 
@@ -26,6 +27,7 @@ namespace PixelFlowClone.Editor
             EnsureSceneFolder();
 
             LevelDataSO level = AssetDatabase.LoadAssetAtPath<LevelDataSO>(LevelPath);
+            LevelDataSO level2 = AssetDatabase.LoadAssetAtPath<LevelDataSO>(Level002Path);
             CollectorUnit collectorPrefab =
                 AssetDatabase.LoadAssetAtPath<CollectorUnit>(CollectorPrefabPath);
             PixelBlock blockPrefab = AssetDatabase.LoadAssetAtPath<PixelBlock>(BlockPrefabPath);
@@ -55,23 +57,14 @@ namespace PixelFlowClone.Editor
 
             GameObject levelGo = new GameObject("LevelManager");
             LevelManager levelManager = levelGo.AddComponent<LevelManager>();
-            SerializedObject levelSo = new SerializedObject(levelManager);
-            SerializedProperty levels = levelSo.FindProperty("_levels");
-            levels.arraySize = level != null ? 1 : 0;
-            if (level != null)
-                levels.GetArrayElementAtIndex(0).objectReferenceValue = level;
-            levelSo.FindProperty("_loadSavedLevelOnStart").boolValue = false;
-            levelSo.ApplyModifiedPropertiesWithoutUndo();
+            AssignLevels(levelManager, level, level2);
 
             new GameObject("InputManager").AddComponent<InputManager>();
 
             GameObject bootstrapGo = new GameObject("Bootstrapper");
             Bootstrapper bootstrapper = bootstrapGo.AddComponent<Bootstrapper>();
             SerializedObject bootSo = new SerializedObject(bootstrapper);
-            SerializedProperty bootLevels = bootSo.FindProperty("_levels");
-            bootLevels.arraySize = level != null ? 1 : 0;
-            if (level != null)
-                bootLevels.GetArrayElementAtIndex(0).objectReferenceValue = level;
+            AssignLevelsProperty(bootSo.FindProperty("_levels"), level, level2);
             bootSo.FindProperty("_loadMainMenuOnStart").boolValue = true;
             bootSo.FindProperty("_nextSceneName").stringValue = SceneLoader.MainMenuSceneName;
             bootSo.ApplyModifiedPropertiesWithoutUndo();
@@ -81,6 +74,34 @@ namespace PixelFlowClone.Editor
             AssetDatabase.Refresh();
 
             Debug.Log($"[PixelFlowClone] Bootstrap scene saved: {ScenePath}");
+        }
+
+        private static void AssignLevels(LevelManager levelManager, params LevelDataSO[] levels)
+        {
+            SerializedObject levelSo = new SerializedObject(levelManager);
+            AssignLevelsProperty(levelSo.FindProperty("_levels"), levels);
+            levelSo.FindProperty("_loadSavedLevelOnStart").boolValue = false;
+            levelSo.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void AssignLevelsProperty(SerializedProperty levelsProp, params LevelDataSO[] levels)
+        {
+            int count = 0;
+            for (int i = 0; i < levels.Length; i++)
+            {
+                if (levels[i] != null)
+                    count++;
+            }
+
+            levelsProp.arraySize = count;
+            int write = 0;
+            for (int i = 0; i < levels.Length; i++)
+            {
+                if (levels[i] == null)
+                    continue;
+                levelsProp.GetArrayElementAtIndex(write).objectReferenceValue = levels[i];
+                write++;
+            }
         }
 
         public static void BuildBootstrapSceneBatch()

@@ -59,6 +59,9 @@ namespace PixelFlowClone.Editor
             config.MaxQueueSlots = 5;
             config.CollectorMoveSpeed = 3f;
             config.LapCompleteEpsilon = 0.05f;
+            config.EndgameCollectorThreshold = 5;
+            config.EndgameMoveSpeedMultiplier = 1.75f;
+            config.EndgameSkipQueueOnLap = true;
             config.RaycastDistance = 2f;
             config.PixelBlockLayer = PhysicsLayers.GetLayerMask(PhysicsLayers.PixelBlock);
             config.RaycastSide = PerpendicularSide.Inward;

@@ -59,8 +59,13 @@ public class ConveyorMovementSmokeTest : MonoBehaviour
             return;
         }
 
+        // Same path as Bootstrap → Menu → Play (ConfigureFromLevel + camera + queue layout).
+        ConveyorPathManager.Instance.ConfigureFromLevel(
+            _level,
+            ConveyorPathManager.Instance.PathRoot,
+            _config);
         PoolManager.Instance.Prewarm(_level, _config);
-        QueueManager.Instance.SpawnWaitingFromLevel(_level);
+        QueueManager.Instance.LoadLevel(_level);
         GridManager.Instance.SpawnGrid(_level);
         Debug.Log(
             $"[SmokeTest] Spawned grid RemainingBlocks={GridManager.Instance.RemainingBlocks}, " +

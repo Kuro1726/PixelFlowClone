@@ -4,6 +4,7 @@ using PixelFlowClone.Conveyor;
 using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.Entities;
+using PixelFlowClone.Utils;
 using UnityEngine;
 
 namespace PixelFlowClone.Managers
@@ -18,6 +19,7 @@ namespace PixelFlowClone.Managers
         [SerializeField] private Transform _pathRoot;
         [SerializeField] private ConveyorPathSO _pathData;
         [SerializeField] private GameConfigSO _config;
+        [SerializeField] private float _pathMargin = LevelLayout.DefaultPathMargin;
 
         private readonly List<ConveyorWaypoint> _waypoints = new();
         private readonly List<CollectorUnit> _activeUnits = new();
@@ -25,6 +27,7 @@ namespace PixelFlowClone.Managers
         private readonly Dictionary<CollectorUnit, bool> _hasLeftEntrySinceDispatch = new();
 
         private int _entryListIndex;
+        private float _effectiveRaycastDistance;
 
         public int ActiveCount => _activeUnits.Count;
 
@@ -34,15 +37,73 @@ namespace PixelFlowClone.Managers
 
         public Transform PathRoot => _pathRoot;
 
+        public float PathMargin => Mathf.Max(_pathMargin, LevelLayout.DefaultPathMargin);
+
         public IReadOnlyList<CollectorUnit> ActiveUnits => _activeUnits;
 
         public IReadOnlyList<ConveyorWaypoint> Waypoints => _waypoints;
 
-        public float MoveSpeed => _pathData != null && _config != null
-            ? _pathData.ResolveMoveSpeed(_config)
-            : _config != null ? _config.CollectorMoveSpeed : 3f;
+        /// <summary>
+        /// Raycast reach used for consume. Scales with the active level grid when configured.
+        /// </summary>
+        public float EffectiveRaycastDistance
+        {
+            get
+            {
+                if (_effectiveRaycastDistance > 0f)
+                    return _effectiveRaycastDistance;
+                return _config != null ? _config.RaycastDistance : 20f;
+            }
+        }
+
+        public float MoveSpeed
+        {
+            get
+            {
+                float baseSpeed = _pathData != null && _config != null
+                    ? _pathData.ResolveMoveSpeed(_config)
+                    : _config != null ? _config.CollectorMoveSpeed : 3f;
+
+                if (IsEndgameRushActive())
+                {
+                    float multiplier = _config != null ? _config.EndgameMoveSpeedMultiplier : 1f;
+                    return baseSpeed * Mathf.Max(0.01f, multiplier);
+                }
+
+                return baseSpeed;
+            }
+        }
 
         public float WaypointReachEpsilon => _config != null ? _config.LapCompleteEpsilon : 0.05f;
+
+        /// <summary>
+        /// True when total collectors across conveyor + waiting + queue is at/below the config threshold.
+        /// </summary>
+        public bool IsEndgameRushActive()
+        {
+            if (_config == null)
+                return false;
+
+            int threshold = Mathf.Max(0, _config.EndgameCollectorThreshold);
+            return CountAliveCollectors() <= threshold;
+        }
+
+        public static int CountAliveCollectors()
+        {
+            int total = 0;
+            if (HasInstance)
+                total += Instance.ActiveCount;
+
+            if (QueueManager.HasInstance)
+            {
+                QueueManager queue = QueueManager.Instance;
+                if (queue.Waiting != null)
+                    total += queue.Waiting.Count;
+                total += queue.OccupiedSlots;
+            }
+
+            return total;
+        }
 
         protected override void OnSingletonAwake()
         {
@@ -62,7 +123,87 @@ namespace PixelFlowClone.Managers
 
         public void ConfigureFromLevel(LevelDataSO level, Transform pathRoot, GameConfigSO config)
         {
-            Configure(pathRoot, level != null ? level.PathReference : null, config);
+            if (pathRoot != null)
+                _pathRoot = pathRoot;
+            if (config != null)
+                _config = config;
+            if (level != null)
+                _pathData = level.PathReference;
+
+            RebuildPathAroundLevel(level);
+            CacheWaypoints();
+
+            if (level != null)
+            {
+                float margin = Mathf.Max(_pathMargin, LevelLayout.DefaultPathMargin);
+                float recommended = LevelLayout.RecommendedRaycastDistance(level, margin);
+                float configured = _config != null ? _config.RaycastDistance : recommended;
+                _effectiveRaycastDistance = Mathf.Max(configured, recommended);
+                LevelLayout.FitCameraToLevel(Camera.main, level, margin);
+                Debug.Log(
+                    $"[ConveyorPathManager] Path rebuilt for grid {level.GridSize.x}x{level.GridSize.y}; " +
+                    $"raycast={_effectiveRaycastDistance:0.##}");
+            }
+        }
+
+        /// <summary>
+        /// Moves (or creates) the 8 loop waypoints to frame the level grid.
+        /// </summary>
+        public void RebuildPathAroundLevel(LevelDataSO level)
+        {
+            if (level == null)
+                return;
+
+            if (_pathRoot == null)
+            {
+                var go = new GameObject("ConveyorPath");
+                _pathRoot = go.transform;
+            }
+
+            IReadOnlyList<Vector2> positions = LevelLayout.ComputeConveyorLoopPositions(
+                level,
+                Mathf.Max(_pathMargin, LevelLayout.DefaultPathMargin));
+            ConveyorWaypoint[] existing = _pathRoot.GetComponentsInChildren<ConveyorWaypoint>(true)
+                .OrderBy(w => w.Index)
+                .ToArray();
+
+            for (int i = 0; i < positions.Count; i++)
+            {
+                ConveyorWaypoint waypoint;
+                if (i < existing.Length)
+                {
+                    waypoint = existing[i];
+                }
+                else
+                {
+                    var go = new GameObject($"Waypoint_{i:D2}");
+                    go.transform.SetParent(_pathRoot, false);
+                    waypoint = go.AddComponent<ConveyorWaypoint>();
+                    SetWaypointIndex(waypoint, i);
+                }
+
+                waypoint.transform.position = new Vector3(positions[i].x, positions[i].y, 0f);
+                SetWaypointIndex(waypoint, i);
+            }
+
+            // Hide extras if a larger custom path was authored.
+            for (int i = positions.Count; i < existing.Length; i++)
+            {
+                if (existing[i] != null)
+                    existing[i].gameObject.SetActive(false);
+            }
+
+            for (int i = 0; i < Mathf.Min(positions.Count, existing.Length); i++)
+            {
+                if (existing[i] != null)
+                    existing[i].gameObject.SetActive(true);
+            }
+        }
+
+        private static void SetWaypointIndex(ConveyorWaypoint waypoint, int index)
+        {
+            if (waypoint != null)
+                waypoint.SetIndex(index);
         }
 
         public void CacheWaypoints()
@@ -197,6 +338,15 @@ namespace PixelFlowClone.Managers
         private void HandleLapComplete(CollectorUnit unit)
         {
             unit.OnLapComplete();
+
+            // Endgame rush keeps the unit on the belt — reset lap flag so the next circuit can fire.
+            if (unit != null &&
+                unit.State == CollectorState.OnConveyor &&
+                _hasLeftEntrySinceDispatch.ContainsKey(unit))
+            {
+                _hasLeftEntrySinceDispatch[unit] = false;
+            }
+
             GameEvents.RaiseCollectorLapComplete(unit);
         }
 

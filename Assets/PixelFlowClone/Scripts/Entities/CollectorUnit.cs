@@ -26,6 +26,9 @@ namespace PixelFlowClone.Entities
         private Coroutine _exitRoutine;
         private Vector3 _defaultScale = Vector3.one;
         private float _nextConsumeTime;
+        private int _lastConsumeLane;
+        private bool _hasConsumeLane;
+        private Vector2 _consumeMoveDir = Vector2.right;
 
         public ColorId Color { get; private set; }
         public int Capacity { get; private set; }
@@ -112,7 +115,8 @@ namespace PixelFlowClone.Entities
                 return;
 
             DrawPerpendicularRayPreview();
-            TryConsumeBlocks();
+            // Consume runs after movement in ConveyorPathManager so high-speed sweeps
+            // sample along the path traveled this physics step.
         }
 
         /// <summary>
@@ -146,6 +150,8 @@ namespace PixelFlowClone.Entities
             if (_spriteRenderer != null) _spriteRenderer.color = ColorPalette.ToColor(color);
             RefreshCapacityLabel();
             _nextConsumeTime = 0f;
+            _hasConsumeLane = false;
+            _consumeMoveDir = Vector2.right;
         }
 
         /// <summary>
@@ -190,14 +196,16 @@ namespace PixelFlowClone.Entities
         public void OnSpawnFromPool()
         {
             CurrentMoveDirection = Vector2.right;
+            _consumeMoveDir = Vector2.right;
             transform.localScale = _defaultScale;
             _exitRoutine = null;
             _nextConsumeTime = 0f;
+            _hasConsumeLane = false;
         }
 
         /// <summary>
-        /// Moves toward <paramref name="waypointListIndex"/> along the conveyor loop using kinematic physics.
-        /// Returns true when the target waypoint was reached and the index advanced to the next segment.
+        /// Moves toward the current waypoint, then fires one inward raycast per grid lane crossed.
+        /// Lane = column index when moving horizontally, row index when moving vertically.
         /// </summary>
         public bool TickMovement(
             float deltaTime,
@@ -212,33 +220,66 @@ namespace PixelFlowClone.Entities
             if (waypoints == null || waypoints.Count == 0)
                 return false;
 
+            Vector2 before = _rigidbody.position;
+
             waypointListIndex = Mathf.Clamp(waypointListIndex, 0, waypoints.Count - 1);
             Vector2 target = waypoints[waypointListIndex].Position;
-            Vector2 pos = _rigidbody.position;
-            Vector2 toTarget = target - pos;
+            Vector2 toTarget = target - before;
             float distance = toTarget.magnitude;
+            bool reachedWaypoint = false;
 
             if (distance <= reachEpsilon)
             {
-                _rigidbody.MovePosition(target);
-                CurrentMoveDirection = GetSegmentDirection(waypoints, waypointListIndex);
+                ApplyKinematicPosition(target);
+                RefreshConsumeDirection(GetSegmentDirection(waypoints, waypointListIndex));
                 AdvanceWaypointIndex(ref waypointListIndex, waypoints.Count);
-                return true;
+                reachedWaypoint = true;
             }
-
-            Vector2 dir = toTarget / distance;
-            CurrentMoveDirection = dir;
-            float step = speed * deltaTime;
-
-            if (distance <= step)
+            else
             {
-                _rigidbody.MovePosition(target);
-                AdvanceWaypointIndex(ref waypointListIndex, waypoints.Count);
-                return true;
+                Vector2 dir = toTarget / distance;
+                RefreshConsumeDirection(dir);
+                float step = speed * deltaTime;
+                if (distance <= step)
+                {
+                    ApplyKinematicPosition(target);
+                    AdvanceWaypointIndex(ref waypointListIndex, waypoints.Count);
+                    reachedWaypoint = true;
+                }
+                else
+                {
+                    ApplyKinematicPosition(before + dir * step);
+                }
             }
 
-            _rigidbody.MovePosition(pos + dir * step);
-            return false;
+            Vector2 after = _rigidbody.position;
+            TryConsumeForLanesCrossed(before, after);
+            return reachedWaypoint;
+        }
+
+        private void RefreshConsumeDirection(Vector2 dir)
+        {
+            if (dir.sqrMagnitude < 0.0001f)
+                return;
+
+            dir.Normalize();
+            // New belt edge: next lane on that edge may fire again.
+            if (Vector2.Dot(dir, _consumeMoveDir) < 0.3f)
+                _hasConsumeLane = false;
+
+            _consumeMoveDir = dir;
+            CurrentMoveDirection = dir;
+        }
+
+        private void ApplyKinematicPosition(Vector2 worldPos)
+        {
+            if (_rigidbody != null)
+            {
+                _rigidbody.position = worldPos;
+                _rigidbody.MovePosition(worldPos);
+            }
+
+            transform.position = new Vector3(worldPos.x, worldPos.y, transform.position.z);
         }
 
         private static Vector2 GetSegmentDirection(IReadOnlyList<ConveyorWaypoint> waypoints, int listIndex)
@@ -254,9 +295,10 @@ namespace PixelFlowClone.Entities
         }
 
         /// <summary>
-        /// Raycasts perpendicular to movement and consumes a matching block when hit.
+        /// Pixel Flow lane rule: each time the unit enters a new grid lane along the belt,
+        /// fire one max-distance inward ray. Nearest block same color → eat; else stop for that lane.
         /// </summary>
-        public void TryConsumeBlocks()
+        private void TryConsumeForLanesCrossed(Vector2 from, Vector2 to)
         {
             if (State != CollectorState.OnConveyor || Capacity <= 0)
                 return;
@@ -264,16 +306,58 @@ namespace PixelFlowClone.Entities
             if (Time.time < _nextConsumeTime)
                 return;
 
-            if (!ConveyorPathManager.HasInstance || !GridManager.HasInstance)
+            if (!GridManager.HasInstance)
+                return;
+
+            bool movingVertically = Mathf.Abs(CurrentMoveDirection.y) >= Mathf.Abs(CurrentMoveDirection.x);
+            int laneFrom = GridManager.Instance.GetLaneIndex(from, movingVertically);
+            int laneTo = GridManager.Instance.GetLaneIndex(to, movingVertically);
+
+            if (laneFrom == laneTo)
+            {
+                if (!_hasConsumeLane || _lastConsumeLane != laneTo)
+                    FireLaneConsume(to, laneTo, movingVertically);
+                return;
+            }
+
+            int step = laneTo > laneFrom ? 1 : -1;
+            for (int lane = laneFrom + step; ; lane += step)
+            {
+                Vector2 origin = GridManager.Instance.GetLaneRayOrigin(to, lane, movingVertically);
+                // Keep the perpendicular axis from the real pose so the ray still aims inward.
+                if (movingVertically)
+                    origin.x = to.x;
+                else
+                    origin.y = to.y;
+
+                FireLaneConsume(origin, lane, movingVertically);
+
+                if (lane == laneTo || Capacity <= 0 || State != CollectorState.OnConveyor)
+                    break;
+            }
+        }
+
+        private void FireLaneConsume(Vector2 origin, int lane, bool movingVertically)
+        {
+            if (State != CollectorState.OnConveyor || Capacity <= 0)
+                return;
+
+            if (_hasConsumeLane && _lastConsumeLane == lane)
+                return;
+
+            _lastConsumeLane = lane;
+            _hasConsumeLane = true;
+
+            if (!ConveyorPathManager.HasInstance)
                 return;
 
             GameConfigSO config = ConveyorPathManager.Instance.Config;
             if (config == null)
                 return;
 
-            Vector2 origin = _rigidbody != null ? _rigidbody.position : (Vector2)transform.position;
             Vector2 gridCenter = GridManager.Instance.GridCenterWorld;
 
+            // Nearest hit only: same color → eat; other color / empty → done for this lane.
             if (!PerpendicularRaycastSensor.TryDetectConsumable(
                     origin,
                     CurrentMoveDirection,
@@ -289,22 +373,46 @@ namespace PixelFlowClone.Entities
             Capacity = Mathf.Max(0, Capacity - 1);
             RefreshCapacityLabel();
 
-            float cooldown = Mathf.Max(0f, config.ConsumeCooldownSeconds);
-            _nextConsumeTime = Time.time + cooldown;
-
             if (Capacity == 0)
                 BeginExit();
         }
 
+        /// <summary>Legacy no-op; lane consume runs inside <see cref="TickMovement"/>.</summary>
+        public void TryConsumeAlongMovement(Vector2 from, Vector2 to)
+        {
+        }
+
+        public void TryConsumeBlocks()
+        {
+            Vector2 pos = _rigidbody != null ? _rigidbody.position : (Vector2)transform.position;
+            TryConsumeForLanesCrossed(pos, pos);
+        }
+
+        public void TryConsumeOnce()
+        {
+            TryConsumeBlocks();
+        }
+
         /// <summary>
         /// Called when the unit completes one full conveyor loop and returns to the entry waypoint.
-        /// Capacity &gt; 0 → queue (Phase 2); Capacity == 0 → exit.
+        /// Capacity == 0 → exit. Otherwise → queue, unless endgame rush keeps it circulating.
         /// </summary>
         public void OnLapComplete()
         {
             if (Capacity <= 0)
             {
                 BeginExit();
+                return;
+            }
+
+            if (ConveyorPathManager.HasInstance &&
+                ConveyorPathManager.Instance.IsEndgameRushActive() &&
+                ConveyorPathManager.Instance.Config != null &&
+                ConveyorPathManager.Instance.Config.EndgameSkipQueueOnLap)
+            {
+                Debug.Log(
+                    $"[CollectorUnit] Endgame rush — stay on conveyor " +
+                    $"(color={Color}, capacity={Capacity}, alive={ConveyorPathManager.CountAliveCollectors()}).");
                 return;
             }
 
@@ -396,6 +504,8 @@ namespace PixelFlowClone.Entities
             CurrentMoveDirection = Vector2.right;
             transform.localScale = _defaultScale;
             _nextConsumeTime = 0f;
+            _hasConsumeLane = false;
+            _consumeMoveDir = Vector2.right;
             _stateMachine.ResetTo(CollectorState.Pooled);
             if (_capacityLabel != null) _capacityLabel.text = string.Empty;
         }

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using PixelFlowClone.Data;
 using PixelFlowClone.Entities;
 using PixelFlowClone.Managers;
+using PixelFlowClone.Utils;
 using UnityEngine;
 
 namespace PixelFlowClone.Queue
@@ -23,6 +24,8 @@ namespace PixelFlowClone.Queue
         private readonly List<List<CollectorUnit>> _columns = new();
         private readonly List<CollectorUnit> _flatCache = new();
         private int _restoreColumn = -1;
+        private float _defaultSlotSpacing = -1f;
+        private float _defaultColumnSpacing = -1f;
 
         public int Count
         {
@@ -76,6 +79,40 @@ namespace PixelFlowClone.Queue
             }
         }
 
+        /// <summary>
+        /// Places the waiting stack just below the conveyor path for the given level grid.
+        /// </summary>
+        public void AnchorToLevel(LevelDataSO level, float pathMargin = LevelLayout.DefaultPathMargin)
+        {
+            if (level == null)
+                return;
+
+            EnsureStackRoot();
+            ApplySpacingFromLevel(level);
+            Vector2 world = LevelLayout.GetWaitingStackWorldPosition(level, pathMargin);
+            transform.position = new Vector3(world.x, world.y, transform.position.z);
+            _stackRoot.localPosition = Vector3.zero;
+        }
+
+        /// <summary>
+        /// Applies waiting unit/column spacing from the level (≤0 keeps scene defaults).
+        /// </summary>
+        public void ApplySpacingFromLevel(LevelDataSO level)
+        {
+            if (_defaultSlotSpacing < 0f)
+            {
+                _defaultSlotSpacing = _slotSpacing;
+                _defaultColumnSpacing = _columnSpacing;
+            }
+
+            _slotSpacing = level != null && level.WaitingUnitSpacing > 0.01f
+                ? level.WaitingUnitSpacing
+                : _defaultSlotSpacing;
+            _columnSpacing = level != null && level.WaitingColumnSpacing > 0.01f
+                ? level.WaitingColumnSpacing
+                : _defaultColumnSpacing;
+        }
+
         public void SpawnFromLevel(LevelDataSO level)
         {
             Clear();
@@ -95,6 +132,7 @@ namespace PixelFlowClone.Queue
                 return;
             }
 
+            AnchorToLevel(level);
             EnsureStackRoot();
             _columnCount = level.WaitingColumns.Length;
             EnsureColumnCount();

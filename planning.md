@@ -903,7 +903,7 @@ public static class DeadlockDetector
 | 3.2 | Async scene loading | `SCN_MainMenu` via `SceneManager.LoadSceneAsync` | Progress 0–1 |
 | 3.3 | `LoadingScreen` | Game title + progress bar + `"Loading..."` | English strings |
 | 3.4 | `MainMenuScreen` | Buttons: Play → level pick, Instructions, Settings | Play mở chọn level |
-| 3.5 | Level Select grid | Unlock theo `PlayerPrefs`, hiển thị `"Level {0}"` | Mở từ Play; polish unlock sau |
+| 3.5 | Level Select grid | Unlock theo `PlayerPrefs`, hiển thị `"Level {0}"` | Key: `PFC_HighestUnlockedLevel`; mở từ Play |
 | 3.6 | Settings popup | Audio ON/OFF, Haptic ON/OFF | `PlayerPrefs` keys |
 | 3.7 | `SCN_Gameplay` integration | `GameplayContext` prefab in scene | |
 | 3.8 | `GameplayHUD` — top bar | Pause button, `"Level {0}"` label | |
@@ -1068,7 +1068,7 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P3-03** Implement `LoadingScreen.cs` — title + progress bar + `"Loading..."`
 - [x] **P3-04** Tạo `SCN_MainMenu.unity` + `MainMenuScreen.cs`
 - [x] **P3-05** Implement nút `"Play"` → chọn level rồi load từ `LevelManager`
-- [~] **P3-06** Level Select từ Play (list `"Level {0}"` / LevelName) — còn unlock theo `PlayerPrefs`
+- [x] **P3-06** Level Select grid `"Level {0}"` + unlock `PlayerPrefs` (`PFC_HighestUnlockedLevel`)
 - [ ] **P3-07** Implement Settings: Audio toggle, Haptic toggle → `PlayerPrefs`
 - [ ] **P3-08** Hoàn thiện `SCN_Gameplay.unity` với `PF_GameplayContext` + HUD
 - [ ] **P3-09** Implement `GameplayHUD` top bar: Pause + `"Level {0}"`

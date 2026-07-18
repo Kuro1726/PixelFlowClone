@@ -177,39 +177,65 @@ namespace PixelFlowClone.UI.Screens
 
             _levelButtons.Clear();
 
+            Transform gridRoot = _levelSelectRoot.Find("LevelGrid");
+            if (gridRoot == null)
+            {
+                var gridGo = new GameObject("LevelGrid", typeof(RectTransform));
+                gridGo.transform.SetParent(_levelSelectRoot, false);
+                RectTransform gridRect = gridGo.GetComponent<RectTransform>();
+                gridRect.anchorMin = new Vector2(0.1f, 0.24f);
+                gridRect.anchorMax = new Vector2(0.9f, 0.68f);
+                gridRect.offsetMin = Vector2.zero;
+                gridRect.offsetMax = Vector2.zero;
+
+                GridLayoutGroup grid = gridGo.AddComponent<GridLayoutGroup>();
+                grid.cellSize = new Vector2(280f, 110f);
+                grid.spacing = new Vector2(24f, 24f);
+                grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
+                grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+                grid.childAlignment = TextAnchor.UpperCenter;
+                grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+                grid.constraintCount = 2;
+                gridRoot = gridGo.transform;
+            }
+
             if (!LevelManager.HasInstance)
                 return;
 
             IReadOnlyList<LevelDataSO> levels = LevelManager.Instance.Levels;
-            int count = levels.Count;
-            if (count == 0)
-                return;
-
-            // Stack level buttons above Back (Back sits near the bottom).
-            float top = 0.62f;
-            float height = 0.08f;
-            float gap = 0.02f;
-
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < levels.Count; i++)
             {
-                LevelDataSO level = levels[i];
-                string label = level != null && !string.IsNullOrEmpty(level.LevelName)
-                    ? level.LevelName
-                    : string.Format("Level {0}", i + 1);
-
-                float max = top - i * (height + gap);
-                float min = max - height;
-                if (min < 0.22f)
-                    break;
+                bool unlocked = LevelManager.Instance.IsLevelUnlocked(i);
+                string label = string.Format("Level {0}", i + 1);
+                if (!unlocked)
+                    label += "\nLocked";
 
                 int index = i;
                 Button button = CreateMenuButton(
-                    _levelSelectRoot,
+                    gridRoot,
                     $"LevelButton_{i}",
                     label,
-                    new Vector2(0.2f, min),
-                    new Vector2(0.8f, max));
-                button.onClick.AddListener(() => HandleLevelButtonClicked(index));
+                    Vector2.zero,
+                    Vector2.one,
+                    stretchToParent: false);
+
+                RectTransform rect = button.transform as RectTransform;
+                if (rect != null)
+                {
+                    rect.localScale = Vector3.one;
+                    rect.anchoredPosition = Vector2.zero;
+                }
+
+                Image image = button.GetComponent<Image>();
+                if (image != null)
+                    image.color = unlocked
+                        ? new Color(0.22f, 0.45f, 0.72f, 1f)
+                        : new Color(0.25f, 0.27f, 0.32f, 1f);
+
+                button.interactable = unlocked;
+                if (unlocked)
+                    button.onClick.AddListener(() => HandleLevelButtonClicked(index));
+
                 _levelButtons.Add(button);
             }
         }
@@ -302,22 +328,34 @@ namespace PixelFlowClone.UI.Screens
             string name,
             string label,
             Vector2 anchorMin,
-            Vector2 anchorMax)
+            Vector2 anchorMax,
+            bool stretchToParent = true)
         {
             Image image = CreateImage(parent, name, new Color(0.22f, 0.45f, 0.72f, 1f));
-            image.rectTransform.anchorMin = anchorMin;
-            image.rectTransform.anchorMax = anchorMax;
-            image.rectTransform.offsetMin = Vector2.zero;
-            image.rectTransform.offsetMax = Vector2.zero;
+            if (stretchToParent)
+            {
+                image.rectTransform.anchorMin = anchorMin;
+                image.rectTransform.anchorMax = anchorMax;
+                image.rectTransform.offsetMin = Vector2.zero;
+                image.rectTransform.offsetMax = Vector2.zero;
+            }
+            else
+            {
+                image.rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+                image.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+                image.rectTransform.sizeDelta = new Vector2(280f, 110f);
+            }
+
             image.raycastTarget = true;
 
             Button button = image.gameObject.AddComponent<Button>();
             ColorBlock colors = button.colors;
             colors.highlightedColor = new Color(0.3f, 0.55f, 0.85f, 1f);
             colors.pressedColor = new Color(0.15f, 0.35f, 0.55f, 1f);
+            colors.disabledColor = new Color(0.2f, 0.2f, 0.22f, 0.85f);
             button.colors = colors;
 
-            TMP_Text text = CreateLabel(image.transform, "Label", label, 40f, FontStyles.Bold);
+            TMP_Text text = CreateLabel(image.transform, "Label", label, 36f, FontStyles.Bold);
             StretchFull(text.rectTransform);
             text.raycastTarget = false;
 

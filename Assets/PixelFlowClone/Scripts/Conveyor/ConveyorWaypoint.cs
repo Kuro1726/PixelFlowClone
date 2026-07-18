@@ -21,6 +21,11 @@ namespace PixelFlowClone.Conveyor
         public int Index => _index;
         public Vector2 Position => transform.position;
 
+        public void SetIndex(int index)
+        {
+            _index = Mathf.Max(0, index);
+        }
+
         /// <summary>
         /// Returns all sibling waypoints under the same parent, sorted by Index.
         /// </summary>

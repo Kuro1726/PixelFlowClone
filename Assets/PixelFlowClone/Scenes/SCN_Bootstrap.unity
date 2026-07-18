@@ -260,6 +260,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _levels:
   - {fileID: 11400000, guid: 3c4d5e6f708192a3b4c5d6e7f8091a2b, type: 2}
+  - {fileID: 11400000, guid: 8b7c6d5e4f3a29180796a5b4c3d2e1f0, type: 2}
+  - {fileID: 11400000, guid: 02b180619ca825c49a5c368e9f74cc58, type: 2}
   _ensureInputManager: 1
   _loadMainMenuOnStart: 1
   _nextSceneName: SCN_MainMenu
@@ -357,7 +359,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _levels:
   - {fileID: 11400000, guid: 3c4d5e6f708192a3b4c5d6e7f8091a2b, type: 2}
+  - {fileID: 11400000, guid: 8b7c6d5e4f3a29180796a5b4c3d2e1f0, type: 2}
+  - {fileID: 11400000, guid: 02b180619ca825c49a5c368e9f74cc58, type: 2}
   _loadSavedLevelOnStart: 0
+  _gameplayLoadMinSeconds: 0.75
 --- !u!1 &500000001
 GameObject:
   m_ObjectHideFlags: 0

@@ -19,6 +19,8 @@ namespace PixelFlowClone.Managers
 
         public IReadOnlyDictionary<Vector2Int, PixelBlock> Blocks => _blocks;
 
+        public LevelDataSO CurrentLevel => _currentLevel;
+
         /// <summary>
         /// Number of unconsumed blocks still tracked on the grid. Used for win checks (== 0).
         /// </summary>
@@ -145,6 +147,49 @@ namespace PixelFlowClone.Managers
         private Vector3 GridLocalToWorld(Vector3 local)
         {
             return _gridRoot != null ? _gridRoot.TransformPoint(local) : local;
+        }
+
+        private Vector3 GridWorldToLocal(Vector3 world)
+        {
+            return _gridRoot != null ? _gridRoot.InverseTransformPoint(world) : world;
+        }
+
+        /// <summary>
+        /// Discrete lane index along the belt: column X when moving horizontally, row Y when moving vertically.
+        /// One consume ray is fired when this index changes.
+        /// </summary>
+        public int GetLaneIndex(Vector2 worldPos, bool movingVertically)
+        {
+            if (_currentLevel == null)
+                return 0;
+
+            Vector3 local = GridWorldToLocal(worldPos);
+            LevelDataSO level = _currentLevel;
+            if (movingVertically)
+            {
+                float spacingY = Mathf.Max(0.01f, level.CellSpacing.y);
+                return Mathf.RoundToInt((local.y - level.GridOrigin.y) / spacingY);
+            }
+
+            float spacingX = Mathf.Max(0.01f, level.CellSpacing.x);
+            return Mathf.RoundToInt((local.x - level.GridOrigin.x) / spacingX);
+        }
+
+        /// <summary>World position used for a lane raycast (snapped to that lane center on the move axis).</summary>
+        public Vector2 GetLaneRayOrigin(Vector2 worldPos, int lane, bool movingVertically)
+        {
+            if (_currentLevel == null)
+                return worldPos;
+
+            Vector3 local = GridWorldToLocal(worldPos);
+            LevelDataSO level = _currentLevel;
+            if (movingVertically)
+                local.y = level.GridOrigin.y + lane * level.CellSpacing.y;
+            else
+                local.x = level.GridOrigin.x + lane * level.CellSpacing.x;
+
+            Vector3 world = GridLocalToWorld(local);
+            return new Vector2(world.x, world.y);
         }
 
         private void EnsureGridRoot()

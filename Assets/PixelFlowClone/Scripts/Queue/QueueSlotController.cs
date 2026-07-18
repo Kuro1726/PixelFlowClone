@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using PixelFlowClone.Data;
 using PixelFlowClone.Entities;
 using PixelFlowClone.Managers;
+using PixelFlowClone.Utils;
 using UnityEngine;
 
 namespace PixelFlowClone.Queue
@@ -18,6 +20,7 @@ namespace PixelFlowClone.Queue
         [SerializeField] private Transform[] _slotAnchors;
 
         private CollectorUnit[] _occupants;
+        private float _defaultSlotSpacing = -1f;
 
         public int MaxSlots => _slotCount;
         public int OccupiedCount
@@ -41,6 +44,35 @@ namespace PixelFlowClone.Queue
         public bool IsFull => OccupiedCount >= _slotCount;
         public bool HasEmptySlot => OccupiedCount < _slotCount;
         public IReadOnlyList<CollectorUnit> Units => _occupants;
+
+        /// <summary>
+        /// Places the queue row below the conveyor and applies per-level unit spacing.
+        /// </summary>
+        public void AnchorToLevel(LevelDataSO level, float pathMargin = LevelLayout.DefaultPathMargin)
+        {
+            if (level == null)
+                return;
+
+            EnsureInitialized();
+            ApplySpacingFromLevel(level);
+            Vector2 world = LevelLayout.GetQueueSlotsWorldPosition(level, pathMargin);
+            transform.position = new Vector3(world.x, world.y, transform.position.z);
+            if (_slotsRoot != null)
+                _slotsRoot.localPosition = Vector3.zero;
+            EnsureAnchors();
+            RefreshLayout();
+        }
+
+        /// <summary>Applies <see cref="LevelDataSO.QueueUnitSpacing"/> (≤0 keeps the scene default).</summary>
+        public void ApplySpacingFromLevel(LevelDataSO level)
+        {
+            if (_defaultSlotSpacing < 0f)
+                _defaultSlotSpacing = _slotSpacing;
+
+            _slotSpacing = level != null && level.QueueUnitSpacing > 0.01f
+                ? level.QueueUnitSpacing
+                : _defaultSlotSpacing;
+        }
 
         public bool IsValidSlot(int slotIndex) => slotIndex >= 0 && slotIndex < _slotCount;
 

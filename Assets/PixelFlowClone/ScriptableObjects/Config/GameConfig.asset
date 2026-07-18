@@ -14,8 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   MaxConveyorUnits: 5
   MaxQueueSlots: 5
-  CollectorMoveSpeed: 3
+  CollectorMoveSpeed: 10
   LapCompleteEpsilon: 0.05
+  EndgameCollectorThreshold: 5
+  EndgameMoveSpeedMultiplier: 1.75
+  EndgameSkipQueueOnLap: 1
   RaycastDistance: 20
   PixelBlockLayer:
     serializedVersion: 2

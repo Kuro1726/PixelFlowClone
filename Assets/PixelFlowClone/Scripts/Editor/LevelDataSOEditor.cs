@@ -18,6 +18,11 @@ namespace PixelFlowClone.Editor
         private SerializedProperty _cellSpacing;
         private SerializedProperty _gridOrigin;
         private SerializedProperty _waitingColumns;
+        private SerializedProperty _queueGapBelowPath;
+        private SerializedProperty _waitingGapBelowQueue;
+        private SerializedProperty _queueUnitSpacing;
+        private SerializedProperty _waitingUnitSpacing;
+        private SerializedProperty _waitingColumnSpacing;
         private SerializedProperty _pathReference;
 
         private Vector2Int _previousGridSize;
@@ -32,6 +37,11 @@ namespace PixelFlowClone.Editor
             _cellSpacing = serializedObject.FindProperty("CellSpacing");
             _gridOrigin = serializedObject.FindProperty("GridOrigin");
             _waitingColumns = serializedObject.FindProperty("WaitingColumns");
+            _queueGapBelowPath = serializedObject.FindProperty("QueueGapBelowPath");
+            _waitingGapBelowQueue = serializedObject.FindProperty("WaitingGapBelowQueue");
+            _queueUnitSpacing = serializedObject.FindProperty("QueueUnitSpacing");
+            _waitingUnitSpacing = serializedObject.FindProperty("WaitingUnitSpacing");
+            _waitingColumnSpacing = serializedObject.FindProperty("WaitingColumnSpacing");
             _pathReference = serializedObject.FindProperty("PathReference");
             _previousGridSize = ((LevelDataSO)target).GridSize;
         }
@@ -45,6 +55,8 @@ namespace PixelFlowClone.Editor
             DrawPixelGrid();
             EditorGUILayout.Space();
             DrawCollectors();
+            EditorGUILayout.Space();
+            DrawLayout();
             EditorGUILayout.Space();
             DrawConveyor();
 
@@ -216,6 +228,19 @@ namespace PixelFlowClone.Editor
         {
             EditorGUILayout.LabelField("Collectors", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(_waitingColumns, true);
+        }
+
+        private void DrawLayout()
+        {
+            EditorGUILayout.LabelField("Layout (Queue / Waiting)", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "≤0 uses scene defaults (~1.1). Unit Spacing = gap between collectors in the same row/column.",
+                MessageType.None);
+            EditorGUILayout.PropertyField(_queueGapBelowPath, new GUIContent("Queue Gap Below Path"));
+            EditorGUILayout.PropertyField(_waitingGapBelowQueue, new GUIContent("Waiting Gap Below Queue"));
+            EditorGUILayout.PropertyField(_queueUnitSpacing, new GUIContent("Queue Unit Spacing"));
+            EditorGUILayout.PropertyField(_waitingUnitSpacing, new GUIContent("Waiting Unit Spacing"));
+            EditorGUILayout.PropertyField(_waitingColumnSpacing, new GUIContent("Waiting Column Spacing"));
         }
 
         private void DrawConveyor()

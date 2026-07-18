@@ -78,6 +78,15 @@ namespace PixelFlowClone.Core
             loading.Show();
 
             Debug.Log($"[Bootstrapper] Async loading '{_nextSceneName}'...");
+
+#if UNITY_EDITOR
+            // Bootstrap scene unloads on Single load — clear Inspector selection so UI Toolkit
+            // ListView does not bind disposed _levels SerializedProperties.
+            GameObject selected = UnityEditor.Selection.activeGameObject;
+            if (selected != null && selected.scene == gameObject.scene)
+                UnityEditor.Selection.activeObject = null;
+#endif
+
             yield return SceneLoader.LoadAsync(
                 _nextSceneName,
                 progress =>

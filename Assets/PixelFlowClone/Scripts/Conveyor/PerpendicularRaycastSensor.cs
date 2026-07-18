@@ -1,5 +1,6 @@
 using PixelFlowClone.Data;
 using PixelFlowClone.Entities;
+using PixelFlowClone.Managers;
 using UnityEngine;
 
 namespace PixelFlowClone.Conveyor
@@ -51,6 +52,8 @@ namespace PixelFlowClone.Conveyor
                 : PhysicsLayers.GetLayerMask(PhysicsLayers.PixelBlock);
 
             float distance = config.RaycastDistance;
+            if (ConveyorPathManager.HasInstance)
+                distance = ConveyorPathManager.Instance.EffectiveRaycastDistance;
             // Return all hits along the ray (sorted by distance). Buffer sized for dense grids.
             int hitCount = Physics2D.RaycastNonAlloc(origin, perpendicular, Hits, distance, mask);
 
@@ -124,7 +127,14 @@ namespace PixelFlowClone.Conveyor
             if (perpendicular.sqrMagnitude < 0.001f)
                 return;
 
-            DrawDebugRay(origin, perpendicular.normalized, config.RaycastDistance, matchedConsumable: false, anyPhysicsHit: false);
+            DrawDebugRay(
+                origin,
+                perpendicular.normalized,
+                ConveyorPathManager.HasInstance
+                    ? ConveyorPathManager.Instance.EffectiveRaycastDistance
+                    : config.RaycastDistance,
+                matchedConsumable: false,
+                anyPhysicsHit: false);
 #endif
         }
 
