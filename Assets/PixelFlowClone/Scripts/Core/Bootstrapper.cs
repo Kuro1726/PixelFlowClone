@@ -33,6 +33,7 @@ namespace PixelFlowClone.Core
             PersistentManagers.EnsureGameManager();
             PersistentManagers.EnsureLevelManager(_levels);
             PersistentManagers.EnsureUIManager();
+            PersistentManagers.EnsureAudioManager();
 
             if (_ensureInputManager)
                 PersistentManagers.EnsureInputManager();
@@ -43,7 +44,7 @@ namespace PixelFlowClone.Core
             IsReady = EvaluateReady();
 
             if (IsReady)
-                Debug.Log("[Bootstrapper] Persistent managers ready (Game, Level, UI, Pool, Input).");
+                Debug.Log("[Bootstrapper] Persistent managers ready (Game, Level, UI, Audio, Pool, Input).");
             else
                 Debug.LogError("[Bootstrapper] Bootstrap incomplete — check missing managers.");
 

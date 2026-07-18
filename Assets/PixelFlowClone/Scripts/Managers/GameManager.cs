@@ -1,5 +1,6 @@
 using System;
 using PixelFlowClone.Core;
+using PixelFlowClone.Data;
 using UnityEngine;
 
 namespace PixelFlowClone.Managers
@@ -88,7 +89,7 @@ namespace PixelFlowClone.Managers
             return DeclareVictory();
         }
 
-        private void HandleBlockConsumed()
+        private void HandleBlockConsumed(Vector3 worldPosition, ColorId color)
         {
             CheckWinCondition();
         }

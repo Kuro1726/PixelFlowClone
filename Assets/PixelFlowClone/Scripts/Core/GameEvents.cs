@@ -1,5 +1,7 @@
 using System;
+using PixelFlowClone.Data;
 using PixelFlowClone.Entities;
+using UnityEngine;
 
 namespace PixelFlowClone.Core
 {
@@ -11,7 +13,8 @@ namespace PixelFlowClone.Core
         public static event Action<int, int> OnConveyorCountChanged;
         public static event Action<int, int> OnQueueCountChanged;
         public static event Action<CollectorUnit> OnConveyorDispatchRejected;
-        public static event Action OnBlockConsumed;
+        /// <summary>Fired after a block is consumed. Args: world position, block color.</summary>
+        public static event Action<Vector3, ColorId> OnBlockConsumed;
         public static event Action<CollectorUnit> OnCollectorExited;
         public static event Action<CollectorUnit> OnCollectorLapComplete;
         public static event Action OnVictory;
@@ -27,8 +30,8 @@ namespace PixelFlowClone.Core
         public static void RaiseConveyorDispatchRejected(CollectorUnit unit)
             => OnConveyorDispatchRejected?.Invoke(unit);
 
-        public static void RaiseBlockConsumed()
-            => OnBlockConsumed?.Invoke();
+        public static void RaiseBlockConsumed(Vector3 worldPosition, ColorId color)
+            => OnBlockConsumed?.Invoke(worldPosition, color);
 
         public static void RaiseCollectorExited(CollectorUnit unit)
             => OnCollectorExited?.Invoke(unit);

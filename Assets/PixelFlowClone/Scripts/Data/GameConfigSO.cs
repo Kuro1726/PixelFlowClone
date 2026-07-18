@@ -93,6 +93,15 @@ namespace PixelFlowClone.Data
         [Range(18f, 48f)]
         public float HudFontSize = 32f;
 
+        [Header("Juice")]
+        [Tooltip("Thời gian collector scale-down + bay ra trước khi trả pool (P3-18).")]
+        [Min(0.05f)]
+        public float CollectorExitDuration = 0.35f;
+
+        [Tooltip("Khoảng bay ra (world units) khi capacity về 0.")]
+        [Min(0f)]
+        public float CollectorExitFlyDistance = 1.75f;
+
         private void OnEnable()
         {
             if (PixelBlockLayer.value == 0)

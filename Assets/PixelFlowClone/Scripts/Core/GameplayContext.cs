@@ -2,6 +2,7 @@ using PixelFlowClone.Managers;
 using PixelFlowClone.UI;
 using PixelFlowClone.UI.Popups;
 using PixelFlowClone.UI.Screens;
+using PixelFlowClone.VFX;
 using UnityEngine;
 
 namespace PixelFlowClone.Core
@@ -20,6 +21,7 @@ namespace PixelFlowClone.Core
         [SerializeField] private VictoryPopup _victoryPopup;
         [SerializeField] private DefeatPopup _defeatPopup;
         [SerializeField] private PausePopup _pausePopup;
+        [SerializeField] private BlockConsumeVfx _consumeVfx;
 
         public static GameplayContext Instance { get; private set; }
 
@@ -31,6 +33,7 @@ namespace PixelFlowClone.Core
         public VictoryPopup VictoryPopup => _victoryPopup;
         public DefeatPopup DefeatPopup => _defeatPopup;
         public PausePopup PausePopup => _pausePopup;
+        public BlockConsumeVfx ConsumeVfx => _consumeVfx;
 
         private void Awake()
         {
@@ -48,6 +51,7 @@ namespace PixelFlowClone.Core
             EnsureVictoryPopup();
             EnsureDefeatPopup();
             EnsurePausePopup();
+            EnsureConsumeVfx();
             RegisterWithUIManager();
         }
 
@@ -173,6 +177,21 @@ namespace PixelFlowClone.Core
 
             _pausePopup = PausePopup.CreateRuntime(ResolveHudCanvasRoot());
             Debug.Log("[GameplayContext] Spawned runtime PausePopup.");
+        }
+
+        private void EnsureConsumeVfx()
+        {
+            if (_consumeVfx == null)
+                _consumeVfx = GetComponentInChildren<BlockConsumeVfx>(true);
+
+            if (_consumeVfx == null)
+                _consumeVfx = FindFirstObjectByType<BlockConsumeVfx>(FindObjectsInactive.Include);
+
+            if (_consumeVfx != null)
+                return;
+
+            _consumeVfx = BlockConsumeVfx.CreateRuntime(transform);
+            Debug.Log("[GameplayContext] Spawned runtime BlockConsumeVfx.");
         }
 
         private Transform ResolveHudCanvasRoot()

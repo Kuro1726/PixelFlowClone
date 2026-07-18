@@ -1,6 +1,7 @@
 using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.Queue;
+using PixelFlowClone.Utils;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -14,6 +15,10 @@ namespace PixelFlowClone.Managers
     {
         [SerializeField] private Camera _worldCamera;
         [SerializeField] private LayerMask _tappableLayers = 1 << PhysicsLayers.Collector;
+        [SerializeField] private GameConfigSO _config;
+        [SerializeField] private float _tapCooldownSeconds = TapCooldownGate.DefaultCooldownSeconds;
+
+        private readonly TapCooldownGate _tapCooldown = new(TapCooldownGate.DefaultCooldownSeconds);
 
         private InputAction _pointerPosition;
         private InputAction _pointerPress;
@@ -25,12 +30,14 @@ namespace PixelFlowClone.Managers
             if (_worldCamera == null)
                 _worldCamera = Camera.main;
 
+            RefreshTapCooldownFromConfig();
             CreateInputActions();
         }
 
         private void OnEnable()
         {
             CreateInputActions();
+            RefreshTapCooldownFromConfig();
             _pointerPress.performed += HandlePointerPress;
             _pointerPosition.Enable();
             _pointerPress.Enable();
@@ -77,10 +84,15 @@ namespace PixelFlowClone.Managers
         /// <summary>
         /// Raycasts a screen-space tap against tappable 2D colliders.
         /// Returns true when an <see cref="ITappable"/> receives the tap.
+        /// Guarded by <see cref="TapCooldownGate"/> (P3-16).
         /// </summary>
         public bool ProcessTap(Vector2 screenPosition)
         {
             if (GameManager.HasInstance && !GameManager.Instance.AcceptsGameplayInput)
+                return false;
+
+            RefreshTapCooldownFromConfig();
+            if (!_tapCooldown.IsReady)
                 return false;
 
             Camera worldCamera = ResolveWorldCamera();
@@ -101,8 +113,36 @@ namespace PixelFlowClone.Managers
             if (tappable == null)
                 return false;
 
+            if (!_tapCooldown.TryAccept())
+                return false;
+
             tappable.OnTap();
+
+            if (AudioManager.HasInstance)
+                AudioManager.Instance.PlayTap();
+
             return true;
+        }
+
+        private void RefreshTapCooldownFromConfig()
+        {
+            float seconds = _tapCooldownSeconds;
+            GameConfigSO config = ResolveConfig();
+            if (config != null)
+                seconds = config.TapCooldownSeconds;
+
+            _tapCooldown.SetCooldown(seconds);
+        }
+
+        private GameConfigSO ResolveConfig()
+        {
+            if (_config != null)
+                return _config;
+
+            if (ConveyorPathManager.HasInstance && ConveyorPathManager.Instance.Config != null)
+                return ConveyorPathManager.Instance.Config;
+
+            return null;
         }
 
         private Camera ResolveWorldCamera()

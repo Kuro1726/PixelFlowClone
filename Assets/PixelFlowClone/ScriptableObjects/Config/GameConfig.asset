@@ -25,7 +25,7 @@ MonoBehaviour:
     m_Bits: 64
   RaycastSide: 0
   ConsumeCooldownSeconds: 0.35
-  TapCooldownSeconds: 0.15
+  TapCooldownSeconds: 0.3
   CollectorPoolPrewarm: 20
   BlockPoolPrewarm: 100
   ConveyorPathMargin: 2
@@ -42,3 +42,5 @@ MonoBehaviour:
   CameraVerticalBias: 0.35
   HudBarHeight: 0.08
   HudFontSize: 32
+  CollectorExitDuration: 0.35
+  CollectorExitFlyDistance: 1.75

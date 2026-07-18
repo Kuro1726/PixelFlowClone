@@ -20,11 +20,16 @@ namespace PixelFlowClone.Entities
         [SerializeField] private Rigidbody2D _rigidbody;
         [SerializeField] private SpriteRenderer _spriteRenderer;
         [SerializeField] private TMP_Text _capacityLabel;
-        [SerializeField] private float _exitDuration = 0.25f;
+        [SerializeField] private float _exitDuration = 0.35f;
+        [SerializeField] private float _exitFlyDistance = 1.75f;
+        [SerializeField] private float _rejectShakeDuration = 0.28f;
+        [SerializeField] private float _rejectShakeAmplitude = 0.18f;
 
         private readonly CollectorStateMachine _stateMachine = new();
         private Coroutine _exitRoutine;
+        private Coroutine _rejectShakeRoutine;
         private Vector3 _defaultScale = Vector3.one;
+        private Vector3 _rejectShakeOrigin;
         private float _nextConsumeTime;
         private int _lastConsumeLane;
         private bool _hasConsumeLane;
@@ -91,9 +96,51 @@ namespace PixelFlowClone.Entities
             bool ok = ConveyorPathManager.Instance.DispatchToConveyor(this);
             if (!ok)
             {
-                // P3-19: shake + reject SFX when conveyor is full.
                 Debug.Log($"[CollectorUnit] OnTap rejected ({State}, conveyor full or already active).");
+                PlayRejectShake();
             }
+        }
+
+        /// <summary>
+        /// P3-20: brief horizontal shake when conveyor dispatch is rejected.
+        /// </summary>
+        public void PlayRejectShake()
+        {
+            if (State == CollectorState.Exiting || State == CollectorState.Pooled)
+                return;
+
+            if (!isActiveAndEnabled)
+                return;
+
+            if (_rejectShakeRoutine != null)
+            {
+                StopCoroutine(_rejectShakeRoutine);
+                transform.position = _rejectShakeOrigin;
+                _rejectShakeRoutine = null;
+            }
+
+            _rejectShakeOrigin = transform.position;
+            _rejectShakeRoutine = StartCoroutine(RejectShakeSequence());
+        }
+
+        private IEnumerator RejectShakeSequence()
+        {
+            float duration = Mathf.Max(0.05f, _rejectShakeDuration);
+            float amplitude = Mathf.Max(0.01f, _rejectShakeAmplitude);
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float u = Mathf.Clamp01(elapsed / duration);
+                float damping = 1f - u;
+                float offset = Mathf.Sin(elapsed * 55f) * amplitude * damping;
+                transform.position = _rejectShakeOrigin + new Vector3(offset, 0f, 0f);
+                yield return null;
+            }
+
+            transform.position = _rejectShakeOrigin;
+            _rejectShakeRoutine = null;
         }
 
         private void Reset()
@@ -421,7 +468,7 @@ namespace PixelFlowClone.Entities
         }
 
         /// <summary>
-        /// Transitions OnConveyor → Exiting, leaves the conveyor roster, plays exit stub, then pool-releases.
+        /// Transitions OnConveyor → Exiting, leaves the conveyor roster, plays exit tween, then pool-releases.
         /// </summary>
         public bool BeginExit()
         {
@@ -456,29 +503,107 @@ namespace PixelFlowClone.Entities
         }
 
         /// <summary>
-        /// Stub exit animation (scale down). Phase 3 replaces with full tween / fly-off VFX.
+        /// P3-18: scale-down + fly-off tween before <see cref="PoolManager.ReleaseCollector"/>.
         /// </summary>
         private IEnumerator ExitSequence()
         {
-            Vector3 startScale = transform.localScale;
-            float elapsed = 0f;
-            float duration = Mathf.Max(0.01f, _exitDuration);
+            ResolveExitTunables(out float duration, out float flyDistance);
 
+            Vector3 startPos = transform.position;
+            Vector3 startScale = transform.localScale;
+            UnityEngine.Color startSpriteColor = _spriteRenderer != null
+                ? _spriteRenderer.color
+                : UnityEngine.Color.white;
+            Vector3 flyDir = ResolveExitFlyDirection();
+            Vector3 endPos = startPos + flyDir * flyDistance;
+
+            if (_rigidbody != null)
+                _rigidbody.simulated = false;
+
+            float elapsed = 0f;
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
-                transform.localScale = Vector3.Lerp(startScale, Vector3.zero, t);
+                float u = Mathf.Clamp01(elapsed / duration);
+                // Ease-in-out for scale; ease-out for travel so it pops away quickly at the end.
+                float scaleT = u * u * (3f - 2f * u);
+                float moveT = 1f - (1f - u) * (1f - u);
+
+                transform.position = Vector3.Lerp(startPos, endPos, moveT);
+                transform.localScale = Vector3.Lerp(startScale, Vector3.zero, scaleT);
+
+                if (_spriteRenderer != null)
+                {
+                    UnityEngine.Color c = startSpriteColor;
+                    c.a = Mathf.Lerp(startSpriteColor.a, 0f, scaleT);
+                    _spriteRenderer.color = c;
+                }
+
                 yield return null;
             }
 
+            transform.position = endPos;
             transform.localScale = Vector3.zero;
+            if (_spriteRenderer != null)
+            {
+                UnityEngine.Color c = startSpriteColor;
+                c.a = 0f;
+                _spriteRenderer.color = c;
+            }
+
             CompleteExitAndRelease();
+        }
+
+        private void ResolveExitTunables(out float duration, out float flyDistance)
+        {
+            duration = Mathf.Max(0.05f, _exitDuration);
+            flyDistance = Mathf.Max(0f, _exitFlyDistance);
+
+            GameConfigSO config = null;
+            if (ConveyorPathManager.HasInstance)
+                config = ConveyorPathManager.Instance.Config;
+
+            if (config == null)
+                return;
+
+            if (config.CollectorExitDuration > 0.01f)
+                duration = config.CollectorExitDuration;
+            if (config.CollectorExitFlyDistance >= 0f)
+                flyDistance = config.CollectorExitFlyDistance;
+        }
+
+        private Vector3 ResolveExitFlyDirection()
+        {
+            Vector2 outward = CurrentMoveDirection;
+            if (outward.sqrMagnitude < 0.0001f)
+                outward = Vector2.up;
+            else
+                outward.Normalize();
+
+            // Prefer flying away from the playfield center when available.
+            if (GridManager.HasInstance)
+            {
+                Vector2 fromCenter = (Vector2)transform.position - GridManager.Instance.GridCenterWorld;
+                if (fromCenter.sqrMagnitude > 0.0001f)
+                    outward = fromCenter.normalized;
+            }
+
+            return new Vector3(outward.x, outward.y, 0f);
         }
 
         private void CompleteExitAndRelease()
         {
             _exitRoutine = null;
+
+            if (_rigidbody != null)
+                _rigidbody.simulated = true;
+
+            if (_spriteRenderer != null)
+            {
+                UnityEngine.Color c = _spriteRenderer.color;
+                c.a = 1f;
+                _spriteRenderer.color = c;
+            }
 
             if (!TrySetState(CollectorState.Pooled))
                 ForceState(CollectorState.Pooled);
@@ -499,6 +624,12 @@ namespace PixelFlowClone.Entities
                 _exitRoutine = null;
             }
 
+            if (_rejectShakeRoutine != null)
+            {
+                StopCoroutine(_rejectShakeRoutine);
+                _rejectShakeRoutine = null;
+            }
+
             Color = ColorId.None;
             Capacity = 0;
             CurrentMoveDirection = Vector2.right;
@@ -508,6 +639,16 @@ namespace PixelFlowClone.Entities
             _consumeMoveDir = Vector2.right;
             _stateMachine.ResetTo(CollectorState.Pooled);
             if (_capacityLabel != null) _capacityLabel.text = string.Empty;
+
+            if (_rigidbody != null)
+                _rigidbody.simulated = true;
+
+            if (_spriteRenderer != null)
+            {
+                UnityEngine.Color c = _spriteRenderer.color;
+                c.a = 1f;
+                _spriteRenderer.color = c;
+            }
         }
 
         private void RefreshCapacityLabel()

@@ -137,10 +137,10 @@ public class ConveyorMovementSmokeTest : MonoBehaviour
         Debug.Log("[SmokeTest] Created InputManager at runtime.");
     }
 
-    private void HandleBlockConsumed()
+    private void HandleBlockConsumed(Vector3 worldPosition, ColorId color)
     {
         int remaining = GridManager.HasInstance ? GridManager.Instance.RemainingBlocks : -1;
-        Debug.Log($"[SmokeTest] Block consumed. RemainingBlocks={remaining}");
+        Debug.Log($"[SmokeTest] Block consumed at {worldPosition} ({color}). RemainingBlocks={remaining}");
     }
 
     private static void HandleLapComplete(CollectorUnit unit)

@@ -1080,11 +1080,11 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P3-13** Implement `DefeatPopup` — `"Jammed!"`, `"Out of moves"`, `"Retry"`
 - [x] **P3-14** Implement `PausePopup` — Resume, Restart, Home
 - [x] **P3-15** Implement `UIManager` screen stack + popup show/hide API
-- [ ] **P3-16** Implement `TapCooldownGate` (default `0.15s`) trong `InputManager.ProcessTap`
-- [ ] **P3-17** Implement block consume ParticleSystem VFX
-- [ ] **P3-18** Implement collector exit tween trước `ReleaseCollector`
-- [ ] **P3-19** Implement `AudioManager` với SFX: tap, consume, win, lose, reject
-- [ ] **P3-20** Implement reject shake animation trên `CollectorUnit` khi dispatch fail
+- [x] **P3-16** Implement `TapCooldownGate` (default `0.15s`) trong `InputManager.ProcessTap`
+- [x] **P3-17** Implement block consume ParticleSystem VFX
+- [x] **P3-18** Implement collector exit tween trước `ReleaseCollector`
+- [x] **P3-19** Implement `AudioManager` với SFX: tap, consume, win, lose, reject
+- [x] **P3-20** Implement reject shake animation trên `CollectorUnit` khi dispatch fail
 
 ### Phase 4: Testing & Optimization
 

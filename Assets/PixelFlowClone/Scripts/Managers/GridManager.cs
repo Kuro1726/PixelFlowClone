@@ -134,12 +134,14 @@ namespace PixelFlowClone.Managers
                 return false;
 
             block.Consume();
+            Vector3 worldPosition = block.transform.position;
+            ColorId consumedColor = block.Color;
             _blocks.Remove(gridPosition);
 
             if (PoolManager.Instance != null)
                 PoolManager.Instance.ReleasePixelBlock(block);
 
-            GameEvents.RaiseBlockConsumed();
+            GameEvents.RaiseBlockConsumed(worldPosition, consumedColor);
             return true;
         }
 

@@ -106,6 +106,7 @@ namespace PixelFlowClone.Managers
             {
                 _waiting.RestoreFront(popped);
                 Debug.LogWarning("[QueueManager] Dispatch failed after pop — unit restored to waiting stack.");
+                PlayConveyorFullFeedback(popped);
                 return false;
             }
 
@@ -197,6 +198,7 @@ namespace PixelFlowClone.Managers
                 _queueSlots.TryAssign(slotIndex, removed);
                 NotifyQueueCountChanged();
                 Debug.LogWarning("[QueueManager] Queue dispatch failed — unit restored to slot.");
+                PlayConveyorFullFeedback(removed);
                 return false;
             }
 
@@ -208,7 +210,7 @@ namespace PixelFlowClone.Managers
         }
 
         /// <summary>
-        /// P2-07 feedback stub. Audio/UI can subscribe to the event; visual shake is added in P3-20.
+        /// Reject feedback: SFX via GameEvents, shake on the collector (P3-20).
         /// </summary>
         private static void PlayConveyorFullFeedback(CollectorUnit unit)
         {
@@ -216,6 +218,8 @@ namespace PixelFlowClone.Managers
                 $"[QueueManager] Dispatch rejected — conveyor full. " +
                 $"collector={unit.Color}, capacity={unit.Capacity}");
             GameEvents.RaiseConveyorDispatchRejected(unit);
+            unit.PlayRejectShake();
+            GameSettings.TryHaptic();
         }
 
         private void NotifyQueueCountChanged()

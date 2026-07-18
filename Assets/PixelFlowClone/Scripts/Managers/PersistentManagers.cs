@@ -71,5 +71,18 @@ namespace PixelFlowClone.Managers
             var go = new GameObject("UIManager");
             return go.AddComponent<UIManager>();
         }
+
+        public static AudioManager EnsureAudioManager()
+        {
+            if (AudioManager.HasInstance)
+                return AudioManager.Instance;
+
+            AudioManager existing = Object.FindFirstObjectByType<AudioManager>();
+            if (existing != null)
+                return existing;
+
+            var go = new GameObject("AudioManager");
+            return go.AddComponent<AudioManager>();
+        }
     }
 }
