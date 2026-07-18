@@ -1058,8 +1058,8 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [~] **P2-19** ~~Implement `CanCollectorReachBlock`~~ — cancelled (không còn lose theo reachability)
 - [x] **P2-20** Defeat khi lap enqueue Queue full (`TryEnqueueFromLap` → `DeclareDefeat`)
 - [x] **P2-21** Wire `GameEvents.OnConveyorCountChanged` và `OnQueueCountChanged`
-- [ ] **P2-22** Test thủ công scenario: tap waiting → conveyor, lap → queue, tap queue → conveyor
-- [ ] **P2-23** Test thủ công scenario: conveyor full + tap waiting → reject (không vào queue)
+- [x] **P2-22** Test thủ công scenario: tap waiting → conveyor, lap → queue, tap queue → conveyor *(harness: `QueueFlowScenarioTest` Context Menu `P2-22/Run Queue Flow Scenario`)*
+- [x] **P2-23** Test thủ công scenario: conveyor full + tap waiting → reject (không vào queue) *(harness: `ConveyorFullRejectScenarioTest` Context Menu `P2-23/Run Conveyor-Full Reject Scenario`)*
 
 ### Phase 3: UI/UX & Game Flow
 

@@ -24,12 +24,18 @@ MonoBehaviour:
       InitialCapacity: 1
     - Color: 1
       InitialCapacity: 1
+    - Color: 2
+      InitialCapacity: 1
+    - Color: 2
+      InitialCapacity: 1
+    - Color: 2
+      InitialCapacity: 1
   - Collectors:
     - Color: 1
-      InitialCapacity: 5
+      InitialCapacity: 1
   - Collectors:
-    - Color: 1
+    - Color: 2
       InitialCapacity: 2
-    - Color: 1
+    - Color: 2
       InitialCapacity: 2
   PathReference: {fileID: 11400000, guid: 2b3c4d5e6f708192a3b4c5d6e7f8091a, type: 2}
