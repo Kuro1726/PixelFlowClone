@@ -21,18 +21,18 @@ MonoBehaviour:
   WaitingColumns:
   - Collectors:
     - Color: 1
-      InitialCapacity: 40
+      InitialCapacity: 10
     - Color: 2
       InitialCapacity: 40
     - Color: 1
-      InitialCapacity: 10
+      InitialCapacity: 40
   - Collectors:
     - Color: 2
-      InitialCapacity: 40
+      InitialCapacity: 10
     - Color: 1
       InitialCapacity: 40
     - Color: 2
-      InitialCapacity: 10
+      InitialCapacity: 40
   QueueGapBelowPath: 3
   WaitingGapBelowQueue: 1.25
   QueueUnitSpacing: 3

@@ -17,7 +17,7 @@ MonoBehaviour:
   CollectorMoveSpeed: 10
   LapCompleteEpsilon: 0.05
   EndgameCollectorThreshold: 5
-  EndgameMoveSpeedMultiplier: 1.75
+  EndgameMoveSpeedMultiplier: 2
   EndgameSkipQueueOnLap: 1
   RaycastDistance: 20
   PixelBlockLayer:
