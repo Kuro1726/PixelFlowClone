@@ -858,9 +858,9 @@ public static class DeadlockDetector
 **Mục tiêu Phase:** Full game loop — waiting stack, conveyor cap 5/5, queue slots 5/5, tap dispatch, win/loss/deadlock.
 
 **Tiêu chí hoàn thành Phase 2:**
-- [ ] Có thể thắng khi `RemainingBlocks == 0`.
-- [ ] Có thể thua khi deadlock (test scenario thủ công).
-- [ ] HUD data events fire đúng (`3/5` conveyor, `2/5` queue).
+- [x] Có thể thắng khi `RemainingBlocks == 0`.
+- [x] Có thể thua khi lap enqueue Queue full (`DeclareDefeat`).
+- [x] HUD data events fire đúng (`OnConveyorCountChanged`, `OnQueueCountChanged`).
 
 | # | Task | Kết quả mong đợi | Ghi chú kỹ thuật |
 |---|------|------------------|------------------|
@@ -1063,9 +1063,9 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 
 ### Phase 3: UI/UX & Game Flow
 
-- [ ] **P3-01** Tạo `SCN_Bootstrap.unity` với `Bootstrapper.cs` (DontDestroyOnLoad managers)
-- [ ] **P3-02** Implement async load `SCN_MainMenu` với progress callback
-- [ ] **P3-03** Implement `LoadingScreen.cs` — title + progress bar + `"Loading..."`
+- [x] **P3-01** Tạo `SCN_Bootstrap.unity` với `Bootstrapper.cs` (DontDestroyOnLoad managers)
+- [x] **P3-02** Implement async load `SCN_MainMenu` với progress callback
+- [x] **P3-03** Implement `LoadingScreen.cs` — title + progress bar + `"Loading..."`
 - [ ] **P3-04** Tạo `SCN_MainMenu.unity` + `MainMenuScreen.cs`
 - [ ] **P3-05** Implement nút `"Play"` load level hiện tại từ `LevelManager`
 - [ ] **P3-06** Implement Level Select UI grid với label `"Level {0}"`

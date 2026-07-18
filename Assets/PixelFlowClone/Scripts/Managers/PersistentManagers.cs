@@ -14,6 +14,10 @@ namespace PixelFlowClone.Managers
             if (GameManager.HasInstance)
                 return GameManager.Instance;
 
+            GameManager existing = Object.FindFirstObjectByType<GameManager>();
+            if (existing != null)
+                return existing;
+
             var go = new GameObject("GameManager");
             return go.AddComponent<GameManager>();
         }
@@ -27,11 +31,32 @@ namespace PixelFlowClone.Managers
                 return LevelManager.Instance;
             }
 
+            LevelManager existing = Object.FindFirstObjectByType<LevelManager>();
+            if (existing != null)
+            {
+                if (levels != null && levels.Length > 0)
+                    existing.ConfigureLevels(levels);
+                return existing;
+            }
+
             var go = new GameObject("LevelManager");
             LevelManager manager = go.AddComponent<LevelManager>();
             if (levels != null && levels.Length > 0)
                 manager.ConfigureLevels(levels);
             return manager;
+        }
+
+        public static InputManager EnsureInputManager()
+        {
+            if (InputManager.HasInstance)
+                return InputManager.Instance;
+
+            InputManager existing = Object.FindFirstObjectByType<InputManager>();
+            if (existing != null)
+                return existing;
+
+            var go = new GameObject("InputManager");
+            return go.AddComponent<InputManager>();
         }
     }
 }

@@ -20,6 +20,8 @@ namespace PixelFlowClone.Managers
 
         protected override void OnSingletonAwake()
         {
+            MakePersistent();
+
             if (_worldCamera == null)
                 _worldCamera = Camera.main;
 

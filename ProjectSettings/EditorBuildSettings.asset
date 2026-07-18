@@ -4,5 +4,14 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/PixelFlowClone/Scenes/SCN_Bootstrap.unity
+    guid: 9e8d7c6b5a4938271605f4e3d2c1b0a9
+  - enabled: 1
+    path: Assets/PixelFlowClone/Scenes/SCN_MainMenu.unity
+    guid: 7a6b5c4d3e2f1098a7b6c5d4e3f20192
+  - enabled: 1
+    path: Assets/PixelFlowClone/Scenes/SCN_Gameplay.unity
+    guid: 682bc00dae40a454ca2fc93ea93ebbe0
   m_configObjects: {}
