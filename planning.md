@@ -403,7 +403,9 @@ public enum ColorId
     Purple,
     Orange,
     Pink,
-    Cyan
+    Black,
+    White,
+    Brown
 }
 ```
 

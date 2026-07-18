@@ -19,7 +19,9 @@ namespace PixelFlowClone.Data
                 ColorId.Purple => new Color(0.60f, 0.30f, 0.80f),
                 ColorId.Orange => new Color(0.96f, 0.55f, 0.15f),
                 ColorId.Pink => new Color(0.95f, 0.45f, 0.70f),
-                ColorId.Cyan => new Color(0.25f, 0.80f, 0.85f),
+                ColorId.Black => new Color(0.12f, 0.12f, 0.14f),
+                ColorId.White => new Color(0.95f, 0.95f, 0.95f),
+                ColorId.Brown => new Color(0.55f, 0.32f, 0.14f),
                 _ => Color.clear
             };
         }

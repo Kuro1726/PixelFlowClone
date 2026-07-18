@@ -262,6 +262,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 3c4d5e6f708192a3b4c5d6e7f8091a2b, type: 2}
   - {fileID: 11400000, guid: 8b7c6d5e4f3a29180796a5b4c3d2e1f0, type: 2}
   - {fileID: 11400000, guid: 96eada0f4bd7b574e873d110bd769b39, type: 2}
+  - {fileID: 11400000, guid: 90bbb307ecb4e8c47930135b8bacf7e5, type: 2}
   _ensureInputManager: 1
   _loadMainMenuOnStart: 1
   _nextSceneName: SCN_MainMenu
@@ -361,6 +362,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 3c4d5e6f708192a3b4c5d6e7f8091a2b, type: 2}
   - {fileID: 11400000, guid: 8b7c6d5e4f3a29180796a5b4c3d2e1f0, type: 2}
   - {fileID: 11400000, guid: 96eada0f4bd7b574e873d110bd769b39, type: 2}
+  - {fileID: 11400000, guid: 90bbb307ecb4e8c47930135b8bacf7e5, type: 2}
   _loadSavedLevelOnStart: 0
   _gameplayLoadMinSeconds: 0.75
 --- !u!1 &500000001
@@ -463,6 +465,8 @@ MonoBehaviour:
   _tappableLayers:
     serializedVersion: 2
     m_Bits: 128
+  _config: {fileID: 0}
+  _tapCooldownSeconds: 0.15
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

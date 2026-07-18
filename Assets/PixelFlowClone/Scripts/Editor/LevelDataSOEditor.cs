@@ -149,7 +149,11 @@ namespace PixelFlowClone.Editor
             GUI.backgroundColor = colorId == ColorId.None
                 ? new Color(0.35f, 0.35f, 0.35f)
                 : ColorPalette.ToColor(colorId);
-            GUI.contentColor = colorId == ColorId.Yellow ? Color.black : Color.white;
+            GUI.contentColor = (colorId == ColorId.Yellow ||
+                                colorId == ColorId.White ||
+                                colorId == ColorId.Orange)
+                ? Color.black
+                : Color.white;
 
             string shortName = GetShortName(colorId);
             if (GUILayout.Button(
@@ -258,6 +262,9 @@ namespace PixelFlowClone.Editor
                 ColorId.Purple => "Pu",
                 ColorId.Orange => "O",
                 ColorId.Yellow => "Y",
+                ColorId.Black => "Bk",
+                ColorId.Brown => "Br",
+                ColorId.White => "W",
                 _ => color.ToString().Substring(0, 1)
             };
         }

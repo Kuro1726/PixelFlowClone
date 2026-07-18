@@ -19,7 +19,7 @@ MonoBehaviour:
   EndgameCollectorThreshold: 5
   EndgameMoveSpeedMultiplier: 3
   EndgameSkipQueueOnLap: 1
-  RaycastDistance: 20
+  RaycastDistance: 30
   PixelBlockLayer:
     serializedVersion: 2
     m_Bits: 64
@@ -34,11 +34,11 @@ MonoBehaviour:
   QueueUnitSpacing: 1.5
   WaitingUnitSpacing: 1.5
   WaitingColumnSpacing: 1.5
-  GameplayScreenScale: 1
-  CameraTopPad: 2
+  GameplayScreenScale: 1.4
+  CameraTopPad: 4.5
   CameraWaitingStackDepth: 4.75
   CameraPadding: 0.35
-  CameraHudScreenFraction: 0.1
+  CameraHudScreenFraction: 0.1295
   CameraVerticalBias: 0.35
   HudBarHeight: 0.08
   HudFontSize: 32

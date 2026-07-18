@@ -106,6 +106,8 @@ MonoBehaviour:
   _hud: {fileID: 0}
   _victoryPopup: {fileID: 0}
   _defeatPopup: {fileID: 0}
+  _pausePopup: {fileID: 0}
+  _consumeVfx: {fileID: 0}
 --- !u!1 &662924206191534204
 GameObject:
   m_ObjectHideFlags: 0
@@ -492,6 +494,8 @@ MonoBehaviour:
   _tappableLayers:
     serializedVersion: 2
     m_Bits: 128
+  _config: {fileID: 0}
+  _tapCooldownSeconds: 0.15
 --- !u!1 &4814940209755812133
 GameObject:
   m_ObjectHideFlags: 0

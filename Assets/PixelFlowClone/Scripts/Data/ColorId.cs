@@ -13,6 +13,8 @@ namespace PixelFlowClone.Data
         Purple,
         Orange,
         Pink,
-        Cyan
+        Black,
+        White,
+        Brown
     }
 }
