@@ -103,6 +103,9 @@ MonoBehaviour:
   _conveyor: {fileID: 5681497139379383513}
   _queue: {fileID: 8833700601773830824}
   _input: {fileID: 8663791217256795881}
+  _hud: {fileID: 0}
+  _victoryPopup: {fileID: 0}
+  _defeatPopup: {fileID: 0}
 --- !u!1 &662924206191534204
 GameObject:
   m_ObjectHideFlags: 0

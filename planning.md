@@ -1077,8 +1077,8 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P3-10** Implement `GameplayHUD` conveyor indicator: `"{0}/{1}"` subscribe `OnConveyorCountChanged`
 - [x] **P3-11** ~~Queue count HUD~~ — cancelled (không hiện số Queue; waiting/queue units là visual)
 - [x] **P3-12** Implement `VictoryPopup` — `"Victory!"`, `"Next Level"`, `timeScale = 0`
-- [ ] **P3-13** Implement `DefeatPopup` — `"Jammed!"`, `"Out of moves"`, `"Retry"`
-- [ ] **P3-14** Implement `PausePopup` — Resume, Restart, Home
+- [x] **P3-13** Implement `DefeatPopup` — `"Jammed!"`, `"Out of moves"`, `"Retry"`
+- [x] **P3-14** Implement `PausePopup` — Resume, Restart, Home
 - [ ] **P3-15** Implement `UIManager` screen stack + popup show/hide API
 - [ ] **P3-16** Implement `TapCooldownGate` (default `0.15s`) trong `InputManager.ProcessTap`
 - [ ] **P3-17** Implement block consume ParticleSystem VFX

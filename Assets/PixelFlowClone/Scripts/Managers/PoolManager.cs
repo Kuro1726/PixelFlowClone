@@ -10,6 +10,8 @@ namespace PixelFlowClone.Managers
     /// <summary>
     /// Global object pool for CollectorUnit and PixelBlock. Entities are never destroyed
     /// during gameplay; they are recycled via SetActive(false) + reset hooks.
+    /// Released instances are always reparented under this persistent manager so scene
+    /// unloads cannot destroy pooled objects while the pool still holds references.
     /// </summary>
     public class PoolManager : Singleton<PoolManager>
     {
@@ -62,17 +64,23 @@ namespace PixelFlowClone.Managers
                 createFunc: CreateCollector,
                 actionOnGet: unit =>
                 {
+                    if (unit == null)
+                        return;
                     unit.gameObject.SetActive(true);
                     unit.OnSpawnFromPool();
                 },
                 actionOnRelease: unit =>
                 {
+                    if (unit == null)
+                        return;
                     unit.ResetFromPool();
+                    unit.transform.SetParent(_collectorPoolRoot, false);
                     unit.gameObject.SetActive(false);
                 },
                 actionOnDestroy: unit =>
                 {
-                    if (unit != null) Destroy(unit.gameObject);
+                    if (unit != null)
+                        Destroy(unit.gameObject);
                 },
                 collectionCheck: false,
                 defaultCapacity: _collectorDefaultCapacity,
@@ -80,19 +88,65 @@ namespace PixelFlowClone.Managers
 
             _blockPool = new ObjectPool<PixelBlock>(
                 createFunc: CreateBlock,
-                actionOnGet: block => block.gameObject.SetActive(true),
+                actionOnGet: block =>
+                {
+                    if (block == null)
+                        return;
+                    block.gameObject.SetActive(true);
+                },
                 actionOnRelease: block =>
                 {
+                    if (block == null)
+                        return;
                     block.ResetFromPool();
+                    block.transform.SetParent(_blockPoolRoot, false);
                     block.gameObject.SetActive(false);
                 },
                 actionOnDestroy: block =>
                 {
-                    if (block != null) Destroy(block.gameObject);
+                    if (block != null)
+                        Destroy(block.gameObject);
                 },
                 collectionCheck: false,
                 defaultCapacity: _blockDefaultCapacity,
                 maxSize: _blockMaxSize);
+        }
+
+        /// <summary>
+        /// Drops any pool entries (including destroyed scene leftovers) and rebuilds empty pools.
+        /// Call before spawning into a fresh gameplay scene after an unload.
+        /// </summary>
+        public void ResetPools()
+        {
+            EnsurePoolRoots();
+
+            if (_collectorPool != null)
+            {
+                _collectorPool.Clear();
+                _collectorPool = null;
+            }
+
+            if (_blockPool != null)
+            {
+                _blockPool.Clear();
+                _blockPool = null;
+            }
+
+            // Destroy any leftover children under pool roots (orphans not tracked by ObjectPool).
+            DestroyChildren(_collectorPoolRoot);
+            DestroyChildren(_blockPoolRoot);
+
+            BuildPools();
+            Debug.Log("[PoolManager] Pools reset.");
+        }
+
+        private static void DestroyChildren(Transform root)
+        {
+            if (root == null)
+                return;
+
+            for (int i = root.childCount - 1; i >= 0; i--)
+                Destroy(root.GetChild(i).gameObject);
         }
 
         private CollectorUnit CreateCollector()
@@ -120,6 +174,9 @@ namespace PixelFlowClone.Managers
                 return;
             }
 
+            if (_blockPool == null || _collectorPool == null)
+                BuildPools();
+
             int blockCount = level.CountNonEmptyBlocks();
             int waiting = level.CountWaitingCollectors();
             int collectorCount = waiting + config.MaxConveyorUnits + config.MaxQueueSlots;
@@ -135,24 +192,68 @@ namespace PixelFlowClone.Managers
 
             var buffer = new List<T>(targetCount);
             while (pool.CountAll < targetCount && buffer.Count < targetCount)
-                buffer.Add(pool.Get());
+            {
+                T item = pool.Get();
+                if (item == null)
+                    break;
+                buffer.Add(item);
+            }
 
             for (int i = 0; i < buffer.Count; i++)
-                pool.Release(buffer[i]);
+            {
+                if (buffer[i] != null)
+                    pool.Release(buffer[i]);
+            }
         }
 
-        public CollectorUnit GetCollector() => _collectorPool.Get();
+        public CollectorUnit GetCollector()
+        {
+            if (_collectorPool == null)
+                BuildPools();
+
+            for (int attempt = 0; attempt < 32; attempt++)
+            {
+                CollectorUnit unit = _collectorPool.Get();
+                if (unit != null)
+                    return unit;
+            }
+
+            Debug.LogWarning("[PoolManager] Stale CollectorUnit entries in pool — rebuilding.");
+            ResetPools();
+            return _collectorPool.Get();
+        }
 
         public void ReleaseCollector(CollectorUnit unit)
         {
-            if (unit != null) _collectorPool.Release(unit);
+            if (unit == null || _collectorPool == null)
+                return;
+
+            _collectorPool.Release(unit);
         }
 
-        public PixelBlock GetPixelBlock() => _blockPool.Get();
+        public PixelBlock GetPixelBlock()
+        {
+            if (_blockPool == null)
+                BuildPools();
+
+            for (int attempt = 0; attempt < 32; attempt++)
+            {
+                PixelBlock block = _blockPool.Get();
+                if (block != null)
+                    return block;
+            }
+
+            Debug.LogWarning("[PoolManager] Stale PixelBlock entries in pool — rebuilding.");
+            ResetPools();
+            return _blockPool.Get();
+        }
 
         public void ReleasePixelBlock(PixelBlock block)
         {
-            if (block != null) _blockPool.Release(block);
+            if (block == null || _blockPool == null)
+                return;
+
+            _blockPool.Release(block);
         }
     }
 }

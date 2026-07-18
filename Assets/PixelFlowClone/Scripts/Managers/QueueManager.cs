@@ -44,8 +44,17 @@ namespace PixelFlowClone.Managers
         /// <summary>Clears previous queue state and spawns the waiting collectors for a level.</summary>
         public void LoadLevel(LevelDataSO level)
         {
+            ClearAll();
+            if (level != null)
+                SpawnWaitingFromLevel(level);
+        }
+
+        /// <summary>Releases every waiting/queue collector back to the pool.</summary>
+        public void ClearAll()
+        {
             _queueSlots?.Clear();
-            SpawnWaitingFromLevel(level);
+            _waiting?.Clear();
+            NotifyQueueCountChanged();
         }
 
         /// <summary>Applies per-level collector spacing; scene positions stay fixed.</summary>

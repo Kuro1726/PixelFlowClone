@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2c3d4e5f6a758091b2c3d4e5f6a7089, type: 3}
+  m_Name: Level_003
+  m_EditorClassIdentifier: 
+  LevelId: 3
+  LevelName: Level 003
+  GridSize: {x: 5, y: 5}
+  BlockMatrix: 00000000000000000000000000000000000000000000000004000000040000000400000000000000000000000400000005000000040000000000000000000000040000000400000004000000000000000000000000000000000000000000000000000000
+  CellSpacing: {x: 1, y: 1}
+  GridOrigin: {x: -2, y: -2}
+  WaitingColumns:
+  - Collectors:
+    - Color: 5
+      InitialCapacity: 40
+    - Color: 5
+      InitialCapacity: 40
+    - Color: 5
+      InitialCapacity: 40
+  - Collectors:
+    - Color: 5
+      InitialCapacity: 20
+    - Color: 5
+      InitialCapacity: 20
+    - Color: 5
+      InitialCapacity: 20
+  QueueGapBelowPath: 0
+  WaitingGapBelowQueue: 0
+  QueueUnitSpacing: 0
+  WaitingUnitSpacing: 0
+  WaitingColumnSpacing: 0
+  PathReference: {fileID: 11400000, guid: 2b3c4d5e6f708192a3b4c5d6e7f8091a, type: 2}

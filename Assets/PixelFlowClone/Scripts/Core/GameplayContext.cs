@@ -17,6 +17,8 @@ namespace PixelFlowClone.Core
         [SerializeField] private InputManager _input;
         [SerializeField] private GameplayHUD _hud;
         [SerializeField] private VictoryPopup _victoryPopup;
+        [SerializeField] private DefeatPopup _defeatPopup;
+        [SerializeField] private PausePopup _pausePopup;
 
         public static GameplayContext Instance { get; private set; }
 
@@ -26,6 +28,8 @@ namespace PixelFlowClone.Core
         public InputManager Input => _input;
         public GameplayHUD Hud => _hud;
         public VictoryPopup VictoryPopup => _victoryPopup;
+        public DefeatPopup DefeatPopup => _defeatPopup;
+        public PausePopup PausePopup => _pausePopup;
 
         private void Awake()
         {
@@ -41,6 +45,8 @@ namespace PixelFlowClone.Core
             PersistentManagers.EnsureLevelManager();
             EnsureHud();
             EnsureVictoryPopup();
+            EnsureDefeatPopup();
+            EnsurePausePopup();
         }
 
         /// <summary>
@@ -98,13 +104,41 @@ namespace PixelFlowClone.Core
             if (_victoryPopup != null)
                 return;
 
+            _victoryPopup = VictoryPopup.CreateRuntime(ResolveHudCanvasRoot());
+            Debug.Log("[GameplayContext] Spawned runtime VictoryPopup.");
+        }
+
+        private void EnsureDefeatPopup()
+        {
+            if (_defeatPopup == null)
+                _defeatPopup = FindFirstObjectByType<DefeatPopup>(FindObjectsInactive.Include);
+
+            if (_defeatPopup != null)
+                return;
+
+            _defeatPopup = DefeatPopup.CreateRuntime(ResolveHudCanvasRoot());
+            Debug.Log("[GameplayContext] Spawned runtime DefeatPopup.");
+        }
+
+        private void EnsurePausePopup()
+        {
+            if (_pausePopup == null)
+                _pausePopup = FindFirstObjectByType<PausePopup>(FindObjectsInactive.Include);
+
+            if (_pausePopup != null)
+                return;
+
+            _pausePopup = PausePopup.CreateRuntime(ResolveHudCanvasRoot());
+            Debug.Log("[GameplayContext] Spawned runtime PausePopup.");
+        }
+
+        private Transform ResolveHudCanvasRoot()
+        {
             Transform parent = _hud != null ? _hud.transform : transform;
             Canvas canvas = parent.GetComponentInChildren<Canvas>(true);
             if (canvas != null)
                 parent = canvas.transform;
-
-            _victoryPopup = VictoryPopup.CreateRuntime(parent);
-            Debug.Log("[GameplayContext] Spawned runtime VictoryPopup.");
+            return parent;
         }
 
         private void OnDestroy()

@@ -193,6 +193,8 @@ namespace PixelFlowClone.Managers
             if (GameManager.HasInstance)
                 GameManager.Instance.BeginLoading();
 
+            ReclaimGameplayEntities();
+
             LoadingScreen loading = LoadingScreen.CreateRuntime(transform);
             loading.SetTitle(LoadingScreen.DefaultTitle);
             loading.SetStatus(LoadingScreen.DefaultStatus);
@@ -217,6 +219,66 @@ namespace PixelFlowClone.Managers
                 Destroy(loading.gameObject);
 
             _playRoutine = null;
+        }
+
+        /// <summary>
+        /// Pause / Home: leave gameplay and return to the main menu scene.
+        /// </summary>
+        public void ReturnToMainMenu()
+        {
+            if (_playRoutine != null)
+            {
+                Debug.LogWarning("[LevelManager] ReturnToMainMenu ignored — already loading.");
+                return;
+            }
+
+            _playRoutine = StartCoroutine(ReturnToMainMenuRoutine());
+        }
+
+        private IEnumerator ReturnToMainMenuRoutine()
+        {
+            ReclaimGameplayEntities();
+
+            if (GameManager.HasInstance)
+                GameManager.Instance.BeginLoading();
+
+            LoadingScreen loading = LoadingScreen.CreateRuntime(transform);
+            loading.SetTitle(LoadingScreen.DefaultTitle);
+            loading.SetStatus(LoadingScreen.DefaultStatus);
+            loading.SetProgress(0f);
+            loading.Show();
+
+            Debug.Log($"[LevelManager] Returning to {SceneLoader.MainMenuSceneName}");
+
+#if UNITY_EDITOR
+            ClearEditorSelectionInActiveScene();
+#endif
+            yield return SceneLoader.LoadAsync(
+                SceneLoader.MainMenuSceneName,
+                loading.SetProgress,
+                minDurationSeconds: 0.35f);
+
+            if (loading != null)
+                Destroy(loading.gameObject);
+
+            if (PoolManager.HasInstance)
+                PoolManager.Instance.ResetPools();
+
+            _playRoutine = null;
+        }
+
+        /// <summary>
+        /// Releases scene-parented pooled entities back under PoolManager before a scene unload.
+        /// </summary>
+        private static void ReclaimGameplayEntities()
+        {
+            GameplayContext context = GameplayContext.Instance;
+            if (context == null)
+                return;
+
+            context.Conveyor?.ClearActiveUnits();
+            context.Queue?.ClearAll();
+            context.Grid?.ClearGrid();
         }
 
         /// <summary>
@@ -289,8 +351,13 @@ namespace PixelFlowClone.Managers
                 GameManager.Instance.BeginLoading();
             }
 
-            if (PoolManager.HasInstance && context.Conveyor != null)
-                PoolManager.Instance.Prewarm(CurrentLevel, context.Conveyor.Config);
+            if (PoolManager.HasInstance)
+            {
+                // Drop any stale refs left from a previous gameplay scene unload.
+                PoolManager.Instance.ResetPools();
+                if (context.Conveyor != null)
+                    PoolManager.Instance.Prewarm(CurrentLevel, context.Conveyor.Config);
+            }
 
             if (context.Conveyor != null)
             {

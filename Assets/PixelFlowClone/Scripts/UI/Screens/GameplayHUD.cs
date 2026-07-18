@@ -228,12 +228,6 @@ namespace PixelFlowClone.UI.Screens
                 if (game.Pause())
                     Debug.Log("[GameplayHUD] Paused.");
             }
-            else if (game.CurrentState == GameState.Paused)
-            {
-                // Temporary until PausePopup (P3-14): Pause button toggles Resume.
-                if (game.Resume())
-                    Debug.Log("[GameplayHUD] Resumed.");
-            }
 
             RefreshPauseLabel();
         }
@@ -254,9 +248,8 @@ namespace PixelFlowClone.UI.Screens
             if (_pauseButtonLabel == null)
                 return;
 
-            bool paused = GameManager.HasInstance &&
-                          GameManager.Instance.CurrentState == GameState.Paused;
-            _pauseButtonLabel.text = paused ? "Resume" : "Pause";
+            // Resume lives on PausePopup (P3-14); top-bar button only opens pause.
+            _pauseButtonLabel.text = "Pause";
         }
 
         /// <summary>
