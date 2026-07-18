@@ -155,6 +155,7 @@ namespace PixelFlowClone.Managers
             }
 
             _effectiveRaycastDistance = Mathf.Max(configured, playfieldReach);
+            NotifyConveyorCountChanged();
             Debug.Log(
                 $"[ConveyorPathManager] Path rebuilt around playfield; margin={PathMargin:0.##}, " +
                 $"raycast={_effectiveRaycastDistance:0.##}");

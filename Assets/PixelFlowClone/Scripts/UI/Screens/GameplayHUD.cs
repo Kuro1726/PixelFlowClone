@@ -1,3 +1,4 @@
+using System;
 using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.Managers;
@@ -10,13 +11,17 @@ using UnityEngine.UI;
 namespace PixelFlowClone.UI.Screens
 {
     /// <summary>
-    /// Gameplay overlay HUD: top bar + conveyor free-slot indicator (remaining/max).
+    /// Gameplay overlay HUD.
+    /// P3-09: top bar Pause + "Level {0}".
+    /// P3-10: conveyor free slots "{0}/{1}" via OnConveyorCountChanged.
+    /// P3-11: queue count HUD cancelled — waiting/queue units are the visual.
     /// </summary>
     public class GameplayHUD : MonoBehaviour
     {
         [SerializeField] private CanvasGroup _canvasGroup;
         [SerializeField] private RectTransform _topBarRoot;
         [SerializeField] private Button _pauseButton;
+        [SerializeField] private TMP_Text _pauseButtonLabel;
         [SerializeField] private TMP_Text _levelLabel;
         [SerializeField] private TMP_Text _conveyorLabel;
 
@@ -24,12 +29,14 @@ namespace PixelFlowClone.UI.Screens
         public TMP_Text LevelLabel => _levelLabel;
         public TMP_Text ConveyorLabel => _conveyorLabel;
 
+        public event Action PauseClicked;
+
         private void Awake()
         {
             EnsureEventSystem();
             RebuildUi();
-            SetLevelIndex(0);
-            SetConveyorCount(0, 5);
+            RefreshLevelLabel();
+            RefreshConveyorIndicator();
         }
 
         private void Start()
@@ -37,31 +44,80 @@ namespace PixelFlowClone.UI.Screens
             // Conveyor/GameConfig may not exist yet during Awake — refresh HUD sizes once ready.
             if (ResolveConfig() != null)
                 RebuildUi();
-        }
 
-        private void RebuildUi()
-        {
-            if (_topBarRoot != null)
-            {
-                Destroy(_topBarRoot.gameObject);
-                _topBarRoot = null;
-                _pauseButton = null;
-                _levelLabel = null;
-                _conveyorLabel = null;
-            }
-
-            BuildRuntimeUi();
+            SubscribeManagers();
+            RefreshLevelLabel();
+            RefreshPauseLabel();
+            RefreshConveyorIndicator();
         }
 
         private void OnEnable()
         {
             GameEvents.OnConveyorCountChanged -= HandleConveyorCountChanged;
             GameEvents.OnConveyorCountChanged += HandleConveyorCountChanged;
+            SubscribeManagers();
+            RefreshLevelLabel();
+            RefreshPauseLabel();
+            RefreshConveyorIndicator();
         }
 
         private void OnDisable()
         {
             GameEvents.OnConveyorCountChanged -= HandleConveyorCountChanged;
+            UnsubscribeManagers();
+            UnwirePauseButton();
+        }
+
+        private void SubscribeManagers()
+        {
+            if (LevelManager.HasInstance)
+            {
+                LevelManager.Instance.LevelLoaded -= HandleLevelLoaded;
+                LevelManager.Instance.LevelLoaded += HandleLevelLoaded;
+            }
+
+            if (GameManager.HasInstance)
+            {
+                GameManager.Instance.StateChanged -= HandleGameStateChanged;
+                GameManager.Instance.StateChanged += HandleGameStateChanged;
+            }
+        }
+
+        private void UnsubscribeManagers()
+        {
+            if (LevelManager.HasInstance)
+                LevelManager.Instance.LevelLoaded -= HandleLevelLoaded;
+
+            if (GameManager.HasInstance)
+                GameManager.Instance.StateChanged -= HandleGameStateChanged;
+        }
+
+        private void RebuildUi()
+        {
+            UnwirePauseButton();
+
+            if (_topBarRoot != null)
+            {
+                Destroy(_topBarRoot.gameObject);
+                _topBarRoot = null;
+                _pauseButton = null;
+                _pauseButtonLabel = null;
+                _levelLabel = null;
+                _conveyorLabel = null;
+            }
+
+            Transform canvasRoot = GetComponent<Canvas>() != null
+                ? transform
+                : (GetComponentInChildren<Canvas>() != null ? GetComponentInChildren<Canvas>().transform : transform);
+            DestroyChildIfExists(canvasRoot, "QueueBar");
+            DestroyChildIfExists(canvasRoot, "QueueLabel");
+            DestroyChildIfExists(canvasRoot, "QueueCaption");
+
+            BuildRuntimeUi();
+            WirePauseButton();
+            RefreshLevelLabel();
+            RefreshPauseLabel();
+            RefreshConveyorIndicator();
         }
 
         public void Show()
@@ -106,9 +162,101 @@ namespace PixelFlowClone.UI.Screens
             _conveyorLabel.text = string.Format("{0}/{1}", remaining, max);
         }
 
+        /// <summary>
+        /// Pulls current conveyor occupancy from <see cref="ConveyorPathManager"/> (or config max).
+        /// </summary>
+        public void RefreshConveyorIndicator()
+        {
+            if (ConveyorPathManager.HasInstance)
+            {
+                ConveyorPathManager conveyor = ConveyorPathManager.Instance;
+                SetConveyorCount(conveyor.ActiveCount, conveyor.MaxCapacity);
+                return;
+            }
+
+            GameConfigSO config = ResolveConfig();
+            int max = config != null ? Mathf.Max(1, config.MaxConveyorUnits) : 5;
+            SetConveyorCount(0, max);
+        }
+
         private void HandleConveyorCountChanged(int active, int max)
         {
             SetConveyorCount(active, max);
+        }
+
+        private void HandleLevelLoaded(LevelDataSO level, int index)
+        {
+            SetLevelIndex(index);
+            RefreshConveyorIndicator();
+        }
+
+        private void HandleGameStateChanged(GameState previous, GameState next)
+        {
+            RefreshPauseLabel();
+        }
+
+        private void WirePauseButton()
+        {
+            if (_pauseButton == null)
+                return;
+
+            _pauseButton.onClick.RemoveListener(HandlePauseClicked);
+            _pauseButton.onClick.AddListener(HandlePauseClicked);
+        }
+
+        private void UnwirePauseButton()
+        {
+            if (_pauseButton == null)
+                return;
+
+            _pauseButton.onClick.RemoveListener(HandlePauseClicked);
+        }
+
+        private void HandlePauseClicked()
+        {
+            PauseClicked?.Invoke();
+
+            if (!GameManager.HasInstance)
+            {
+                Debug.LogWarning("[GameplayHUD] Pause clicked but GameManager is missing.");
+                return;
+            }
+
+            GameManager game = GameManager.Instance;
+            if (game.CurrentState == GameState.Playing)
+            {
+                if (game.Pause())
+                    Debug.Log("[GameplayHUD] Paused.");
+            }
+            else if (game.CurrentState == GameState.Paused)
+            {
+                // Temporary until PausePopup (P3-14): Pause button toggles Resume.
+                if (game.Resume())
+                    Debug.Log("[GameplayHUD] Resumed.");
+            }
+
+            RefreshPauseLabel();
+        }
+
+        private void RefreshLevelLabel()
+        {
+            if (!LevelManager.HasInstance)
+            {
+                SetLevelIndex(0);
+                return;
+            }
+
+            SetLevelIndex(LevelManager.Instance.CurrentLevelIndex);
+        }
+
+        private void RefreshPauseLabel()
+        {
+            if (_pauseButtonLabel == null)
+                return;
+
+            bool paused = GameManager.HasInstance &&
+                          GameManager.Instance.CurrentState == GameState.Paused;
+            _pauseButtonLabel.text = paused ? "Resume" : "Pause";
         }
 
         /// <summary>
@@ -159,7 +307,7 @@ namespace PixelFlowClone.UI.Screens
                 group = gameObject.AddComponent<CanvasGroup>();
             _canvasGroup = group;
 
-            // Clear leftover Queue / old Conveyor widgets from earlier builds.
+            DestroyChildIfExists(root, "QueueBar");
             DestroyChildIfExists(root, "QueueLabel");
             DestroyChildIfExists(root, "QueueCaption");
             DestroyChildIfExists(root, "ConveyorLabel");
@@ -184,7 +332,8 @@ namespace PixelFlowClone.UI.Screens
 
             _pauseButton = CreateHudButton(
                 _topBarRoot, "PauseButton", "Pause",
-                new Vector2(0.02f, 0.14f), new Vector2(0.22f, 0.86f), fontSize: fontSize * 0.9f);
+                new Vector2(0.02f, 0.14f), new Vector2(0.22f, 0.86f), fontSize: fontSize * 0.9f,
+                out _pauseButtonLabel);
 
             Image conveyorBadge = CreateImage(
                 _topBarRoot, "ConveyorBadge", new Color(0.16f, 0.2f, 0.28f, 1f));
@@ -227,7 +376,8 @@ namespace PixelFlowClone.UI.Screens
             string label,
             Vector2 anchorMin,
             Vector2 anchorMax,
-            float fontSize = 28f)
+            float fontSize,
+            out TMP_Text labelText)
         {
             Image image = CreateImage(parent, name, new Color(0.22f, 0.45f, 0.72f, 1f));
             image.rectTransform.anchorMin = anchorMin;
@@ -242,9 +392,9 @@ namespace PixelFlowClone.UI.Screens
             colors.pressedColor = new Color(0.15f, 0.35f, 0.55f, 1f);
             button.colors = colors;
 
-            TMP_Text text = CreateLabel(image.transform, "Label", label, fontSize, FontStyles.Bold);
-            StretchFull(text.rectTransform);
-            text.raycastTarget = false;
+            labelText = CreateLabel(image.transform, "Label", label, fontSize, FontStyles.Bold);
+            StretchFull(labelText.rectTransform);
+            labelText.raycastTarget = false;
             return button;
         }
 
@@ -287,7 +437,7 @@ namespace PixelFlowClone.UI.Screens
 
         private static void EnsureEventSystem()
         {
-            if (Object.FindFirstObjectByType<EventSystem>() != null)
+            if (UnityEngine.Object.FindFirstObjectByType<EventSystem>() != null)
                 return;
 
             var go = new GameObject("EventSystem");

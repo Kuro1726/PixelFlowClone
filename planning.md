@@ -910,7 +910,7 @@ public static class DeadlockDetector
 | 3.7 | `SCN_Gameplay` integration | `GameplayContext` prefab + HUD in scene | `PF_GameplayContext` + `PF_GameplayHUD` |
 | 3.8 | `GameplayHUD` — top bar | Pause button, `"Level {0}"` label | |
 | 3.9 | `GameplayHUD` — center | Conveyor `"X/5"` indicator | Subscribe `OnConveyorCountChanged` |
-| 3.10 | `GameplayHUD` — bottom | Queue `"Y/5"` + waiting stack visual | Subscribe `OnQueueCountChanged` |
+| 3.10 | `GameplayHUD` — bottom | Queue count HUD **cancelled** | Waiting/queue units là visual; không hiện `Y/5` |
 | 3.11 | `VictoryPopup` | `"Victory!"`, confetti VFX, `"Next Level"` | `timeScale = 0` |
 | 3.12 | `DefeatPopup` | `"Jammed!"`, `"Out of moves"`, `"Retry"` | |
 | 3.13 | `PausePopup` | Resume, Restart, Home | Restore `timeScale` on Resume |
@@ -1073,10 +1073,10 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P3-06** Level Select grid `"Level {0}"` + unlock `PlayerPrefs` (`PFC_HighestUnlockedLevel`)
 - [x] **P3-07** Implement Settings: Audio toggle, Haptic toggle → `PlayerPrefs`
 - [x] **P3-08** Hoàn thiện `SCN_Gameplay.unity` với `PF_GameplayContext` + HUD
-- [ ] **P3-09** Implement `GameplayHUD` top bar: Pause + `"Level {0}"`
-- [ ] **P3-10** Implement `GameplayHUD` conveyor indicator: `"{0}/{1}"` subscribe `OnConveyorCountChanged`
-- [ ] **P3-11** Implement `GameplayHUD` queue indicator: `"{0}/{1}"` subscribe `OnQueueCountChanged`
-- [ ] **P3-12** Implement `VictoryPopup` — `"Victory!"`, `"Next Level"`, `timeScale = 0`
+- [x] **P3-09** Implement `GameplayHUD` top bar: Pause + `"Level {0}"`
+- [x] **P3-10** Implement `GameplayHUD` conveyor indicator: `"{0}/{1}"` subscribe `OnConveyorCountChanged`
+- [x] **P3-11** ~~Queue count HUD~~ — cancelled (không hiện số Queue; waiting/queue units là visual)
+- [x] **P3-12** Implement `VictoryPopup` — `"Victory!"`, `"Next Level"`, `timeScale = 0`
 - [ ] **P3-13** Implement `DefeatPopup` — `"Jammed!"`, `"Out of moves"`, `"Retry"`
 - [ ] **P3-14** Implement `PausePopup` — Resume, Restart, Home
 - [ ] **P3-15** Implement `UIManager` screen stack + popup show/hide API

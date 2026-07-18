@@ -108,9 +108,21 @@ namespace PixelFlowClone.Managers
                 return false;
 
             CurrentState = target;
+            ApplyTimeScale(target);
             StateChanged?.Invoke(previous, target);
             Debug.Log($"[GameManager] State: {previous} → {target}");
             return true;
+        }
+
+        private static void ApplyTimeScale(GameState state)
+        {
+            Time.timeScale = state switch
+            {
+                GameState.Paused => 0f,
+                GameState.Victory => 0f,
+                GameState.Defeat => 0f,
+                _ => 1f
+            };
         }
 
         public static bool IsValidTransition(GameState from, GameState to)

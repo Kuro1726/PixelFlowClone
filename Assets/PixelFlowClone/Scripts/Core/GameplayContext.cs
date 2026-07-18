@@ -1,4 +1,5 @@
 using PixelFlowClone.Managers;
+using PixelFlowClone.UI.Popups;
 using PixelFlowClone.UI.Screens;
 using UnityEngine;
 
@@ -15,6 +16,7 @@ namespace PixelFlowClone.Core
         [SerializeField] private QueueManager _queue;
         [SerializeField] private InputManager _input;
         [SerializeField] private GameplayHUD _hud;
+        [SerializeField] private VictoryPopup _victoryPopup;
 
         public static GameplayContext Instance { get; private set; }
 
@@ -23,6 +25,7 @@ namespace PixelFlowClone.Core
         public QueueManager Queue => _queue;
         public InputManager Input => _input;
         public GameplayHUD Hud => _hud;
+        public VictoryPopup VictoryPopup => _victoryPopup;
 
         private void Awake()
         {
@@ -37,6 +40,7 @@ namespace PixelFlowClone.Core
             PersistentManagers.EnsureGameManager();
             PersistentManagers.EnsureLevelManager();
             EnsureHud();
+            EnsureVictoryPopup();
         }
 
         /// <summary>
@@ -84,6 +88,23 @@ namespace PixelFlowClone.Core
             }
 
             _hud.Show();
+        }
+
+        private void EnsureVictoryPopup()
+        {
+            if (_victoryPopup == null)
+                _victoryPopup = FindFirstObjectByType<VictoryPopup>(FindObjectsInactive.Include);
+
+            if (_victoryPopup != null)
+                return;
+
+            Transform parent = _hud != null ? _hud.transform : transform;
+            Canvas canvas = parent.GetComponentInChildren<Canvas>(true);
+            if (canvas != null)
+                parent = canvas.transform;
+
+            _victoryPopup = VictoryPopup.CreateRuntime(parent);
+            Debug.Log("[GameplayContext] Spawned runtime VictoryPopup.");
         }
 
         private void OnDestroy()
