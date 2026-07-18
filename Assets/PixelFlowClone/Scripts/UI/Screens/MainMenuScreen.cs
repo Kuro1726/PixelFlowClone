@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using PixelFlowClone.Data;
 using PixelFlowClone.Managers;
+using PixelFlowClone.UI;
 using PixelFlowClone.UI.Popups;
 using TMPro;
 using UnityEngine;
@@ -50,16 +51,41 @@ namespace PixelFlowClone.UI.Screens
             ShowMainButtons();
             WireButtons();
             RebuildLevelButtons();
+            RegisterWithUIManager();
         }
 
         private void OnDestroy()
         {
+            UnregisterFromUIManager();
             UnwireButtons();
         }
 
         public void Show() => gameObject.SetActive(true);
 
         public void Hide() => gameObject.SetActive(false);
+
+        private void RegisterWithUIManager()
+        {
+            PersistentManagers.EnsureUIManager();
+            if (!UIManager.HasInstance)
+                return;
+
+            UIManager ui = UIManager.Instance;
+            ui.RegisterScreen(ScreenId.MainMenu, gameObject);
+            ui.ShowScreen(ScreenId.MainMenu);
+            if (_settingsPopup != null)
+                ui.RegisterPopup(PopupId.Settings, _settingsPopup);
+        }
+
+        private void UnregisterFromUIManager()
+        {
+            if (!UIManager.HasInstance)
+                return;
+
+            UIManager ui = UIManager.Instance;
+            ui.UnregisterPopup(PopupId.Settings, _settingsPopup);
+            ui.UnregisterScreen(ScreenId.MainMenu);
+        }
 
         private void WireButtons()
         {
@@ -155,7 +181,12 @@ namespace PixelFlowClone.UI.Screens
             if (_levelSelectRoot != null)
                 _levelSelectRoot.gameObject.SetActive(false);
             if (_settingsPopup != null)
-                _settingsPopup.Hide();
+            {
+                if (UIManager.HasInstance)
+                    UIManager.Instance.HidePopup(PopupId.Settings);
+                else
+                    _settingsPopup.Hide();
+            }
             if (_titleText != null)
                 _titleText.text = _title;
         }
@@ -168,7 +199,12 @@ namespace PixelFlowClone.UI.Screens
             if (_levelSelectRoot != null)
                 _levelSelectRoot.gameObject.SetActive(true);
             if (_settingsPopup != null)
-                _settingsPopup.Hide();
+            {
+                if (UIManager.HasInstance)
+                    UIManager.Instance.HidePopup(PopupId.Settings);
+                else
+                    _settingsPopup.Hide();
+            }
             if (_titleText != null)
                 _titleText.text = "Select Level";
         }
@@ -186,7 +222,15 @@ namespace PixelFlowClone.UI.Screens
             if (_titleText != null)
                 _titleText.text = _title;
 
-            _settingsPopup.Show();
+            if (UIManager.HasInstance)
+            {
+                UIManager.Instance.RegisterPopup(PopupId.Settings, _settingsPopup);
+                UIManager.Instance.ShowPopup(PopupId.Settings);
+            }
+            else
+            {
+                _settingsPopup.Show();
+            }
         }
 
         private void EnsureSettingsPopup()

@@ -58,5 +58,18 @@ namespace PixelFlowClone.Managers
             var go = new GameObject("InputManager");
             return go.AddComponent<InputManager>();
         }
+
+        public static UIManager EnsureUIManager()
+        {
+            if (UIManager.HasInstance)
+                return UIManager.Instance;
+
+            UIManager existing = Object.FindFirstObjectByType<UIManager>();
+            if (existing != null)
+                return existing;
+
+            var go = new GameObject("UIManager");
+            return go.AddComponent<UIManager>();
+        }
     }
 }

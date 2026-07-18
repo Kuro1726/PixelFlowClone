@@ -1079,7 +1079,7 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P3-12** Implement `VictoryPopup` — `"Victory!"`, `"Next Level"`, `timeScale = 0`
 - [x] **P3-13** Implement `DefeatPopup` — `"Jammed!"`, `"Out of moves"`, `"Retry"`
 - [x] **P3-14** Implement `PausePopup` — Resume, Restart, Home
-- [ ] **P3-15** Implement `UIManager` screen stack + popup show/hide API
+- [x] **P3-15** Implement `UIManager` screen stack + popup show/hide API
 - [ ] **P3-16** Implement `TapCooldownGate` (default `0.15s`) trong `InputManager.ProcessTap`
 - [ ] **P3-17** Implement block consume ParticleSystem VFX
 - [ ] **P3-18** Implement collector exit tween trước `ReleaseCollector`

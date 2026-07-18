@@ -1,5 +1,7 @@
 using System;
 using PixelFlowClone.Data;
+using PixelFlowClone.Managers;
+using PixelFlowClone.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -104,7 +106,11 @@ namespace PixelFlowClone.UI.Popups
 
         private void HandleCloseClicked()
         {
-            Hide();
+            if (UIManager.HasInstance)
+                UIManager.Instance.HidePopup(PopupId.Settings);
+            else
+                Hide();
+
             Closed?.Invoke();
         }
 

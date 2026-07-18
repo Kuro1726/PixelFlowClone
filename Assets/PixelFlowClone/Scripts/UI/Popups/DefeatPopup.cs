@@ -1,6 +1,6 @@
 using System;
-using PixelFlowClone.Core;
 using PixelFlowClone.Managers;
+using PixelFlowClone.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,7 +9,7 @@ namespace PixelFlowClone.UI.Popups
 {
     /// <summary>
     /// Defeat overlay: "Jammed!", "Out of moves", "Retry" (P3-13).
-    /// Shown when <see cref="GameEvents.OnDefeat"/> fires; GameManager already sets timeScale = 0.
+    /// Visibility is driven by <see cref="UIManager"/> (P3-15).
     /// </summary>
     public class DefeatPopup : MonoBehaviour
     {
@@ -30,21 +30,15 @@ namespace PixelFlowClone.UI.Popups
             Hide();
         }
 
-        private void OnEnable()
-        {
-            GameEvents.OnDefeat -= HandleDefeat;
-            GameEvents.OnDefeat += HandleDefeat;
-        }
-
         private void OnDisable()
         {
-            GameEvents.OnDefeat -= HandleDefeat;
             UnwireButtons();
         }
 
         private void OnDestroy()
         {
-            GameEvents.OnDefeat -= HandleDefeat;
+            if (UIManager.HasInstance)
+                UIManager.Instance.UnregisterPopup(PopupId.Defeat, this);
             UnwireButtons();
         }
 
@@ -73,11 +67,6 @@ namespace PixelFlowClone.UI.Popups
                 _canvasGroup = gameObject.AddComponent<CanvasGroup>();
         }
 
-        private void HandleDefeat()
-        {
-            Show();
-        }
-
         private void WireButtons()
         {
             if (_retryButton == null)
@@ -98,7 +87,11 @@ namespace PixelFlowClone.UI.Popups
         private void HandleRetryClicked()
         {
             RetryClicked?.Invoke();
-            Hide();
+
+            if (UIManager.HasInstance)
+                UIManager.Instance.HidePopup(PopupId.Defeat);
+            else
+                Hide();
 
             if (!LevelManager.HasInstance)
             {

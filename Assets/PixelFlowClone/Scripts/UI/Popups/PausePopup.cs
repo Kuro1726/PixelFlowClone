@@ -1,6 +1,6 @@
 using System;
-using PixelFlowClone.Core;
 using PixelFlowClone.Managers;
+using PixelFlowClone.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,7 +9,7 @@ namespace PixelFlowClone.UI.Popups
 {
     /// <summary>
     /// Pause overlay: Resume, Restart, Home (P3-14).
-    /// Shown while <see cref="GameState.Paused"/>; Resume restores timeScale via GameManager.
+    /// Visibility is driven by <see cref="UIManager"/> (P3-15).
     /// </summary>
     public class PausePopup : MonoBehaviour
     {
@@ -33,21 +33,15 @@ namespace PixelFlowClone.UI.Popups
             Hide();
         }
 
-        private void OnEnable()
-        {
-            SubscribeGameManager();
-            SyncVisibilityToState();
-        }
-
         private void OnDisable()
         {
-            UnsubscribeGameManager();
             UnwireButtons();
         }
 
         private void OnDestroy()
         {
-            UnsubscribeGameManager();
+            if (UIManager.HasInstance)
+                UIManager.Instance.UnregisterPopup(PopupId.Pause, this);
             UnwireButtons();
         }
 
@@ -74,39 +68,6 @@ namespace PixelFlowClone.UI.Popups
                 _canvasGroup = GetComponent<CanvasGroup>();
             if (_canvasGroup == null)
                 _canvasGroup = gameObject.AddComponent<CanvasGroup>();
-        }
-
-        private void SubscribeGameManager()
-        {
-            if (!GameManager.HasInstance)
-                return;
-
-            GameManager.Instance.StateChanged -= HandleGameStateChanged;
-            GameManager.Instance.StateChanged += HandleGameStateChanged;
-        }
-
-        private void UnsubscribeGameManager()
-        {
-            if (!GameManager.HasInstance)
-                return;
-
-            GameManager.Instance.StateChanged -= HandleGameStateChanged;
-        }
-
-        private void HandleGameStateChanged(GameState previous, GameState next)
-        {
-            if (next == GameState.Paused)
-                Show();
-            else
-                Hide();
-        }
-
-        private void SyncVisibilityToState()
-        {
-            if (GameManager.HasInstance && GameManager.Instance.CurrentState == GameState.Paused)
-                Show();
-            else
-                Hide();
         }
 
         private void WireButtons()
@@ -157,7 +118,11 @@ namespace PixelFlowClone.UI.Popups
         private void HandleRestartClicked()
         {
             RestartClicked?.Invoke();
-            Hide();
+
+            if (UIManager.HasInstance)
+                UIManager.Instance.HidePopup(PopupId.Pause);
+            else
+                Hide();
 
             if (!LevelManager.HasInstance)
             {
@@ -173,7 +138,11 @@ namespace PixelFlowClone.UI.Popups
         private void HandleHomeClicked()
         {
             HomeClicked?.Invoke();
-            Hide();
+
+            if (UIManager.HasInstance)
+                UIManager.Instance.HidePopup(PopupId.Pause);
+            else
+                Hide();
 
             if (!LevelManager.HasInstance)
             {

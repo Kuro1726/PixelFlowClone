@@ -1,4 +1,5 @@
 using PixelFlowClone.Managers;
+using PixelFlowClone.UI;
 using PixelFlowClone.UI.Popups;
 using PixelFlowClone.UI.Screens;
 using UnityEngine;
@@ -47,6 +48,48 @@ namespace PixelFlowClone.Core
             EnsureVictoryPopup();
             EnsureDefeatPopup();
             EnsurePausePopup();
+            RegisterWithUIManager();
+        }
+
+        private void OnDestroy()
+        {
+            UnregisterFromUIManager();
+            if (Instance == this)
+                Instance = null;
+        }
+
+        private void RegisterWithUIManager()
+        {
+            PersistentManagers.EnsureUIManager();
+            if (!UIManager.HasInstance)
+                return;
+
+            UIManager ui = UIManager.Instance;
+            ui.RegisterScreen(ScreenId.Gameplay, gameObject);
+            ui.ShowScreen(ScreenId.Gameplay);
+
+            if (_hud != null)
+                ui.RegisterHud(_hud);
+            if (_victoryPopup != null)
+                ui.RegisterPopup(PopupId.Victory, _victoryPopup);
+            if (_defeatPopup != null)
+                ui.RegisterPopup(PopupId.Defeat, _defeatPopup);
+            if (_pausePopup != null)
+                ui.RegisterPopup(PopupId.Pause, _pausePopup);
+        }
+
+        private void UnregisterFromUIManager()
+        {
+            if (!UIManager.HasInstance)
+                return;
+
+            UIManager ui = UIManager.Instance;
+            ui.UnregisterHud(_hud);
+            ui.UnregisterPopup(PopupId.Victory, _victoryPopup);
+            ui.UnregisterPopup(PopupId.Defeat, _defeatPopup);
+            ui.UnregisterPopup(PopupId.Pause, _pausePopup);
+            ui.UnregisterScreen(ScreenId.Gameplay);
+            ui.HideAllPopups();
         }
 
         /// <summary>
@@ -139,12 +182,6 @@ namespace PixelFlowClone.Core
             if (canvas != null)
                 parent = canvas.transform;
             return parent;
-        }
-
-        private void OnDestroy()
-        {
-            if (Instance == this)
-                Instance = null;
         }
     }
 }

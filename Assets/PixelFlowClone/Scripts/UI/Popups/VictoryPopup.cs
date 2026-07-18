@@ -1,6 +1,6 @@
 using System;
-using PixelFlowClone.Core;
 using PixelFlowClone.Managers;
+using PixelFlowClone.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,7 +9,7 @@ namespace PixelFlowClone.UI.Popups
 {
     /// <summary>
     /// Victory overlay: "Victory!", confetti burst, "Next Level" (P3-12).
-    /// Shown when <see cref="GameEvents.OnVictory"/> fires; GameManager already sets timeScale = 0.
+    /// Visibility is driven by <see cref="UIManager"/> (P3-15).
     /// </summary>
     public class VictoryPopup : MonoBehaviour
     {
@@ -30,21 +30,15 @@ namespace PixelFlowClone.UI.Popups
             Hide();
         }
 
-        private void OnEnable()
-        {
-            GameEvents.OnVictory -= HandleVictory;
-            GameEvents.OnVictory += HandleVictory;
-        }
-
         private void OnDisable()
         {
-            GameEvents.OnVictory -= HandleVictory;
             UnwireButtons();
         }
 
         private void OnDestroy()
         {
-            GameEvents.OnVictory -= HandleVictory;
+            if (UIManager.HasInstance)
+                UIManager.Instance.UnregisterPopup(PopupId.Victory, this);
             UnwireButtons();
         }
 
@@ -75,11 +69,6 @@ namespace PixelFlowClone.UI.Popups
                 _canvasGroup = gameObject.AddComponent<CanvasGroup>();
         }
 
-        private void HandleVictory()
-        {
-            Show();
-        }
-
         private void WireButtons()
         {
             if (_nextLevelButton == null)
@@ -100,7 +89,11 @@ namespace PixelFlowClone.UI.Popups
         private void HandleNextLevelClicked()
         {
             NextLevelClicked?.Invoke();
-            Hide();
+
+            if (UIManager.HasInstance)
+                UIManager.Instance.HidePopup(PopupId.Victory);
+            else
+                Hide();
 
             if (!LevelManager.HasInstance)
             {
