@@ -18,6 +18,9 @@ namespace PixelFlowClone.Queue
         [SerializeField] private float _slotSpacing = 1.1f;
         [SerializeField] private Vector2 _layoutDirection = Vector2.right;
         [SerializeField] private Transform[] _slotAnchors;
+        [SerializeField] private Sprite _slotSprite;
+        [SerializeField] private float _slotVisualScale = 1f;
+        [SerializeField] private int _slotSortingOrder = -2;
 
         private CollectorUnit[] _occupants;
         private float _defaultSlotSpacing = -1f;
@@ -297,7 +300,71 @@ namespace PixelFlowClone.Queue
 
                 Vector2 local = GetSlotLocalOffset(i);
                 _slotAnchors[i].localPosition = new Vector3(local.x, local.y, 0f);
+                if (CanMutateHierarchy())
+                    EnsureSlotVisual(_slotAnchors[i]);
             }
+        }
+
+        private static bool CanMutateHierarchy()
+        {
+#if UNITY_EDITOR
+            // Creating children on a Prefab Asset corrupts it; only mutate scene / prefab instances / play mode.
+            if (!Application.isPlaying)
+                return false;
+#endif
+            return true;
+        }
+
+        private void EnsureSlotVisual(Transform anchor)
+        {
+            if (anchor == null || !CanMutateHierarchy())
+                return;
+
+            Transform visual = anchor.Find("SlotVisual");
+            if (_slotSprite == null)
+            {
+                if (visual != null)
+                    visual.gameObject.SetActive(false);
+                return;
+            }
+
+            if (visual == null)
+            {
+                var go = new GameObject("SlotVisual");
+                visual = go.transform;
+                visual.SetParent(anchor, false);
+            }
+
+            visual.gameObject.SetActive(true);
+            visual.localPosition = Vector3.zero;
+            visual.localRotation = Quaternion.identity;
+            visual.localScale = Vector3.one * Mathf.Max(0.01f, _slotVisualScale);
+
+            // Avoid leaving a leftover renderer on the anchor (would scale with collectors).
+            SpriteRenderer onAnchor = anchor.GetComponent<SpriteRenderer>();
+            if (onAnchor != null)
+                DestroyRendererSafe(onAnchor);
+
+            SpriteRenderer sr = visual.GetComponent<SpriteRenderer>();
+            if (sr == null)
+                sr = visual.gameObject.AddComponent<SpriteRenderer>();
+
+            sr.enabled = true;
+            sr.sprite = _slotSprite;
+            sr.sortingOrder = _slotSortingOrder;
+            sr.color = Color.white;
+        }
+
+        private static void DestroyRendererSafe(SpriteRenderer sr)
+        {
+            if (sr == null)
+                return;
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+                Object.DestroyImmediate(sr);
+            else
+#endif
+                Object.Destroy(sr);
         }
 
         private Vector2 GetSlotLocalOffset(int slotIndex)
@@ -332,6 +399,10 @@ namespace PixelFlowClone.Queue
         private void EditorRebuildAnchorsDelayed()
         {
             if (this == null)
+                return;
+
+            // Never mutate Prefab Assets from OnValidate.
+            if (UnityEditor.PrefabUtility.IsPartOfPrefabAsset(gameObject))
                 return;
 
             EnsureAnchors();

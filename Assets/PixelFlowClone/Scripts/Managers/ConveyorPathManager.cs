@@ -21,6 +21,13 @@ namespace PixelFlowClone.Managers
         [SerializeField] private GameConfigSO _config;
         [SerializeField] private float _pathMargin = LevelLayout.DefaultPathMargin;
 
+        [Header("Belt Visual")]
+        [SerializeField] private Sprite _beltSprite;
+        [SerializeField] private int _beltSortingOrder = -8;
+        [Tooltip("Fraction of belt sprite size from outer edge to the track centerline. " +
+                 "Raise if collectors sit inside/outside the painted track.")]
+        [SerializeField] [Range(0.02f, 0.25f)] private float _beltTrackInset = 0.11f;
+
         private readonly List<ConveyorWaypoint> _waypoints = new();
         private readonly List<CollectorUnit> _activeUnits = new();
         private readonly Dictionary<CollectorUnit, int> _unitWaypointIndices = new();
@@ -28,6 +35,7 @@ namespace PixelFlowClone.Managers
 
         private int _entryListIndex;
         private float _effectiveRaycastDistance;
+        private Transform _beltVisual;
 
         public int ActiveCount => _activeUnits.Count;
 
@@ -181,6 +189,7 @@ namespace PixelFlowClone.Managers
                 pathMargin);
             ApplyWaypointPositions(positions);
             CacheWaypoints();
+            RefreshBeltVisual();
         }
 
         /// <summary>
@@ -202,6 +211,89 @@ namespace PixelFlowClone.Managers
                 Mathf.Max(_pathMargin, LevelLayout.DefaultPathMargin));
             ApplyWaypointPositions(positions);
             CacheWaypoints();
+            RefreshBeltVisual();
+        }
+
+        private void RefreshBeltVisual()
+        {
+            if (!Application.isPlaying || _beltSprite == null)
+                return;
+
+            if (_waypoints == null || _waypoints.Count == 0)
+                return;
+
+            EnsureBeltVisualObject();
+            if (_beltVisual == null)
+                return;
+
+            float minX = float.PositiveInfinity;
+            float minY = float.PositiveInfinity;
+            float maxX = float.NegativeInfinity;
+            float maxY = float.NegativeInfinity;
+            for (int i = 0; i < _waypoints.Count; i++)
+            {
+                if (_waypoints[i] == null)
+                    continue;
+                Vector2 p = _waypoints[i].Position;
+                if (p.x < minX) minX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y > maxY) maxY = p.y;
+            }
+
+            if (float.IsInfinity(minX) || float.IsInfinity(minY))
+                return;
+
+            Vector2 center = new((minX + maxX) * 0.5f, (minY + maxY) * 0.5f);
+            float pathW = Mathf.Max(0.01f, maxX - minX);
+            float pathH = Mathf.Max(0.01f, maxY - minY);
+
+            // Waypoints sit on the track centerline. Expand the sprite so that centerline
+            // (inset from the art's outer edge) lines up with the waypoint rectangle.
+            float inset = Mathf.Clamp(_beltTrackInset, 0.02f, 0.25f);
+            float denom = Mathf.Max(0.2f, 1f - 2f * inset);
+            float worldW = pathW / denom;
+            float worldH = pathH / denom;
+
+            SpriteRenderer sr = _beltVisual.GetComponent<SpriteRenderer>();
+            if (sr == null)
+                sr = _beltVisual.gameObject.AddComponent<SpriteRenderer>();
+
+            sr.sprite = _beltSprite;
+            sr.sortingOrder = _beltSortingOrder;
+            sr.color = Color.white;
+            sr.enabled = true;
+
+            Vector2 spriteSize = new(
+                _beltSprite.rect.width / _beltSprite.pixelsPerUnit,
+                _beltSprite.rect.height / _beltSprite.pixelsPerUnit);
+            if (spriteSize.x < 0.001f || spriteSize.y < 0.001f)
+                return;
+
+            _beltVisual.position = new Vector3(center.x, center.y, 0f);
+            _beltVisual.rotation = Quaternion.identity;
+            _beltVisual.localScale = new Vector3(
+                worldW / spriteSize.x,
+                worldH / spriteSize.y,
+                1f);
+        }
+
+        private void EnsureBeltVisualObject()
+        {
+            if (_beltVisual != null)
+                return;
+
+            // Parent to this manager (not pathRoot) so waypoint rebuild never touches it.
+            Transform existing = transform.Find("BeltVisual");
+            if (existing != null)
+            {
+                _beltVisual = existing;
+                return;
+            }
+
+            var go = new GameObject("BeltVisual");
+            _beltVisual = go.transform;
+            _beltVisual.SetParent(transform, false);
         }
 
         private void ApplyWaypointPositions(IReadOnlyList<Vector2> positions)
@@ -315,6 +407,8 @@ namespace PixelFlowClone.Managers
                 if (next != null)
                     unit.SetMoveDirection(next.Position - entryPos);
             }
+
+            unit.PrepareConveyorFacing();
 
             // Prevent same-frame FixedUpdate from consuming with stale physics state.
             Physics2D.SyncTransforms();

@@ -1090,7 +1090,7 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 
 ### Phase 4: Testing & Optimization
 
-- [ ] **P4-01** Tạo `PixelFlowClone.Tests.asmdef` reference runtime assembly
+- [x] **P4-01** Tạo `PixelFlowClone.Tests.asmdef` reference runtime assembly
 - [ ] **P4-02** Extract `CapacityLogic` pure class từ consume logic
 - [ ] **P4-03** Viết `CapacityLogicTests` — decrement đúng, wrong color không giảm
 - [ ] **P4-04** Viết `DeadlockDetectorTests.NotDeadlocked_WhenConveyorNotFull`

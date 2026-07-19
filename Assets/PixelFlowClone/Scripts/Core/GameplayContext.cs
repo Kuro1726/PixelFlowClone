@@ -22,6 +22,7 @@ namespace PixelFlowClone.Core
         [SerializeField] private DefeatPopup _defeatPopup;
         [SerializeField] private PausePopup _pausePopup;
         [SerializeField] private BlockConsumeVfx _consumeVfx;
+        [SerializeField] private GameplayBackground _background;
 
         public static GameplayContext Instance { get; private set; }
 
@@ -34,6 +35,7 @@ namespace PixelFlowClone.Core
         public DefeatPopup DefeatPopup => _defeatPopup;
         public PausePopup PausePopup => _pausePopup;
         public BlockConsumeVfx ConsumeVfx => _consumeVfx;
+        public GameplayBackground Background => _background;
 
         private void Awake()
         {
@@ -52,6 +54,7 @@ namespace PixelFlowClone.Core
             EnsureDefeatPopup();
             EnsurePausePopup();
             EnsureConsumeVfx();
+            EnsureBackground();
             RegisterWithUIManager();
         }
 
@@ -192,6 +195,15 @@ namespace PixelFlowClone.Core
 
             _consumeVfx = BlockConsumeVfx.CreateRuntime(transform);
             Debug.Log("[GameplayContext] Spawned runtime BlockConsumeVfx.");
+        }
+
+        private void EnsureBackground()
+        {
+            if (_background == null)
+                _background = GetComponentInChildren<GameplayBackground>(true);
+
+            if (_background == null)
+                _background = FindFirstObjectByType<GameplayBackground>(FindObjectsInactive.Include);
         }
 
         private Transform ResolveHudCanvasRoot()

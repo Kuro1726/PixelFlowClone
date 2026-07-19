@@ -5,6 +5,7 @@ using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.UI.Screens;
 using PixelFlowClone.Utils;
+using PixelFlowClone.VFX;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -372,6 +373,7 @@ namespace PixelFlowClone.Managers
             context.Queue?.LoadLevel(CurrentLevel);
 
             FitGameplayCamera(CurrentLevel);
+            FitGameplayBackground();
 
             if (context.Hud != null)
                 context.Hud.SetLevelIndex(CurrentLevelIndex);
@@ -411,6 +413,17 @@ namespace PixelFlowClone.Managers
             }
 
             LevelLayout.FitCameraToLevel(camera, level);
+        }
+
+        private static void FitGameplayBackground()
+        {
+            GameplayBackground background = null;
+            if (GameplayContext.Instance != null)
+                background = GameplayContext.Instance.Background;
+            if (background == null)
+                background = UnityEngine.Object.FindFirstObjectByType<GameplayBackground>(FindObjectsInactive.Include);
+
+            background?.FitToCamera(Camera.main);
         }
 
 #if UNITY_EDITOR

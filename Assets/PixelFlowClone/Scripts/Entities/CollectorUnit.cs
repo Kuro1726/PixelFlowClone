@@ -24,6 +24,8 @@ namespace PixelFlowClone.Entities
         [SerializeField] private float _exitFlyDistance = 1.75f;
         [SerializeField] private float _rejectShakeDuration = 0.28f;
         [SerializeField] private float _rejectShakeAmplitude = 0.18f;
+        [Tooltip("World degrees the sprite nose points at local rotation 0. Right=0, Up=90, Left=180, Down=-90.")]
+        [SerializeField] private float _spriteNoseAngleAtRest = 90f;
 
         private readonly CollectorStateMachine _stateMachine = new();
         private Coroutine _exitRoutine;
@@ -34,6 +36,8 @@ namespace PixelFlowClone.Entities
         private int _lastConsumeLane;
         private bool _hasConsumeLane;
         private Vector2 _consumeMoveDir = Vector2.right;
+        /// <summary>After first successful consume this lap, face inward until lap ends.</summary>
+        private bool _faceInwardForRestOfLap;
 
         public ColorId Color { get; private set; }
         public int Capacity { get; private set; }
@@ -46,7 +50,12 @@ namespace PixelFlowClone.Entities
 
         public bool TrySetState(CollectorState target) => _stateMachine.TryTransition(target);
 
-        public void ForceState(CollectorState state) => _stateMachine.ResetTo(state);
+        public void ForceState(CollectorState state)
+        {
+            _stateMachine.ResetTo(state);
+            if (state == CollectorState.InWaitingStack || state == CollectorState.InQueueSlot)
+                ResetFacing();
+        }
 
         /// <summary>
         /// Player tap. Waiting stack → direct to conveyor; queue slot → manual re-dispatch.
@@ -226,6 +235,15 @@ namespace PixelFlowClone.Entities
                 : Vector2.right;
         }
 
+        /// <summary>
+        /// Call when the unit is placed on the belt: face right (initial path direction).
+        /// </summary>
+        public void PrepareConveyorFacing()
+        {
+            _faceInwardForRestOfLap = false;
+            ApplyFacingFromMoveDirection(Vector2.right);
+        }
+
         public void SuppressConsumeFor(float seconds)
         {
             _nextConsumeTime = Time.time + Mathf.Max(0f, seconds);
@@ -245,6 +263,7 @@ namespace PixelFlowClone.Entities
             CurrentMoveDirection = Vector2.right;
             _consumeMoveDir = Vector2.right;
             transform.localScale = _defaultScale;
+            ResetFacing();
             _exitRoutine = null;
             _nextConsumeTime = 0f;
             _hasConsumeLane = false;
@@ -316,6 +335,86 @@ namespace PixelFlowClone.Entities
 
             _consumeMoveDir = dir;
             CurrentMoveDirection = dir;
+            RefreshVisualFacing();
+        }
+
+        /// <summary>
+        /// Before first shot this lap: face along the belt.
+        /// After first successful consume: keep facing inward toward the grid until lap ends.
+        /// </summary>
+        private void RefreshVisualFacing()
+        {
+            if (_faceInwardForRestOfLap)
+            {
+                Vector2 inward = GetCurrentShootDirection();
+                if (inward.sqrMagnitude > 0.0001f)
+                {
+                    ApplyFacingFromMoveDirection(inward);
+                    return;
+                }
+            }
+
+            ApplyFacingFromMoveDirection(CurrentMoveDirection);
+        }
+
+        private Vector2 GetCurrentShootDirection()
+        {
+            if (!ConveyorPathManager.HasInstance)
+                return Vector2.zero;
+
+            GameConfigSO config = ConveyorPathManager.Instance.Config;
+            if (config == null || CurrentMoveDirection.sqrMagnitude < 0.0001f)
+                return Vector2.zero;
+
+            Vector2 origin = _rigidbody != null ? _rigidbody.position : (Vector2)transform.position;
+            Vector2 gridCenter = GridManager.HasInstance
+                ? GridManager.Instance.GridCenterWorld
+                : Vector2.zero;
+
+            return PerpendicularRaycastSensor.ComputePerpendicular(
+                CurrentMoveDirection.normalized,
+                config.RaycastSide,
+                origin,
+                gridCenter);
+        }
+
+        /// <summary>
+        /// Points the sprite nose along <paramref name="dir"/> (belt move or shoot inward).
+        /// </summary>
+        private void ApplyFacingFromMoveDirection(Vector2 dir)
+        {
+            if (dir.sqrMagnitude < 0.0001f)
+                return;
+
+            // Atan2: angle of desired nose from +X. Subtract art's rest nose angle.
+            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - _spriteNoseAngleAtRest;
+            SetFacingAngle(angle);
+        }
+
+        private void ResetFacing()
+        {
+            _faceInwardForRestOfLap = false;
+            // Waiting / queue / pool: authored art pose (nose up at rest).
+            SetFacingAngle(0f);
+        }
+
+        private void SetFacingAngle(float zDegrees)
+        {
+            transform.rotation = Quaternion.Euler(0f, 0f, zDegrees);
+            if (_rigidbody != null)
+                _rigidbody.rotation = zDegrees;
+
+            SnapCapacityLabelAbove();
+        }
+
+        private void SnapCapacityLabelAbove()
+        {
+            if (_capacityLabel == null)
+                return;
+
+            const float labelHeight = 0.6f;
+            _capacityLabel.transform.position = transform.position + Vector3.up * labelHeight;
+            _capacityLabel.transform.rotation = Quaternion.identity;
         }
 
         private void ApplyKinematicPosition(Vector2 worldPos)
@@ -327,6 +426,7 @@ namespace PixelFlowClone.Entities
             }
 
             transform.position = new Vector3(worldPos.x, worldPos.y, transform.position.z);
+            SnapCapacityLabelAbove();
         }
 
         private static Vector2 GetSegmentDirection(IReadOnlyList<ConveyorWaypoint> waypoints, int listIndex)
@@ -403,19 +503,30 @@ namespace PixelFlowClone.Entities
                 return;
 
             Vector2 gridCenter = GridManager.Instance.GridCenterWorld;
+            Vector2 shootDirection = PerpendicularRaycastSensor.ComputePerpendicular(
+                CurrentMoveDirection.normalized,
+                config.RaycastSide,
+                origin,
+                gridCenter);
 
             // Nearest hit only: same color → eat; other color / empty → done for this lane.
-            if (!PerpendicularRaycastSensor.TryDetectConsumable(
+            bool canShoot = PerpendicularRaycastSensor.TryDetectConsumable(
                     origin,
                     CurrentMoveDirection,
                     Color,
                     config,
                     gridCenter,
-                    out PixelBlock hitBlock))
+                    out PixelBlock hitBlock);
+
+            if (!canShoot)
                 return;
 
             if (!GridManager.Instance.TryConsumeBlock(Color, hitBlock.GridPosition))
                 return;
+
+            // First successful shot this lap: face inward for the rest of the lap.
+            _faceInwardForRestOfLap = true;
+            ApplyFacingFromMoveDirection(shootDirection);
 
             Capacity = Mathf.Max(0, Capacity - 1);
             RefreshCapacityLabel();
@@ -446,6 +557,8 @@ namespace PixelFlowClone.Entities
         /// </summary>
         public void OnLapComplete()
         {
+            _faceInwardForRestOfLap = false;
+
             if (Capacity <= 0)
             {
                 BeginExit();
@@ -634,6 +747,7 @@ namespace PixelFlowClone.Entities
             Capacity = 0;
             CurrentMoveDirection = Vector2.right;
             transform.localScale = _defaultScale;
+            ResetFacing();
             _nextConsumeTime = 0f;
             _hasConsumeLane = false;
             _consumeMoveDir = Vector2.right;

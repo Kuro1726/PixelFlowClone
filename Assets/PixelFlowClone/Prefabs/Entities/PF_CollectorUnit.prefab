@@ -285,7 +285,7 @@ Rigidbody2D:
   m_Interpolate: 1
   m_SleepingMode: 1
   m_CollisionDetection: 0
-  m_Constraints: 0
+  m_Constraints: 4
 --- !u!61 &6569212727218966357
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -350,3 +350,4 @@ MonoBehaviour:
   _exitFlyDistance: 1.75
   _rejectShakeDuration: 0.28
   _rejectShakeAmplitude: 0.18
+  _spriteNoseAngleAtRest: 90
