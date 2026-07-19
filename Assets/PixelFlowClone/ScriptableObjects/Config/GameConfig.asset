@@ -34,7 +34,7 @@ MonoBehaviour:
   QueueUnitSpacing: 1.5
   WaitingUnitSpacing: 1.5
   WaitingColumnSpacing: 1.5
-  GameplayScreenScale: 1.4
+  GameplayScreenScale: 1.6
   CameraTopPad: 4.5
   CameraWaitingStackDepth: 4.75
   CameraPadding: 0.35
