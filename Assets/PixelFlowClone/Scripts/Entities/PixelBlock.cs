@@ -6,13 +6,18 @@ namespace PixelFlowClone.Entities
     /// <summary>
     /// A static colored cell in the central grid. Spawned and released via PoolManager,
     /// owned logically by GridManager. Consumed when a matching collector raycasts into it.
+    /// Visual: soft fill + black outline child. Neighboring fills cover inner outlines so
+    /// only the cluster perimeter reads as a thick stroke (Pixel Flow style).
     /// </summary>
     [RequireComponent(typeof(SpriteRenderer))]
     [RequireComponent(typeof(BoxCollider2D))]
     public class PixelBlock : MonoBehaviour
     {
         [SerializeField] private SpriteRenderer _spriteRenderer;
+        [SerializeField] private SpriteRenderer _outlineRenderer;
         [SerializeField] private BoxCollider2D _collider;
+        [SerializeField] private float _outlineScale = 1.12f;
+        [SerializeField] private Color _outlineColor = new(0.05f, 0.05f, 0.08f, 1f);
 
         public ColorId Color { get; private set; }
         public Vector2Int GridPosition { get; private set; }
@@ -28,6 +33,7 @@ namespace PixelFlowClone.Entities
         {
             if (_spriteRenderer == null) _spriteRenderer = GetComponent<SpriteRenderer>();
             if (_collider == null) _collider = GetComponent<BoxCollider2D>();
+            EnsureOutline();
         }
 
         /// <summary>
@@ -48,7 +54,22 @@ namespace PixelFlowClone.Entities
 
             IsConsumed = false;
             if (_collider != null) _collider.enabled = true;
-            if (_spriteRenderer != null) _spriteRenderer.color = ColorPalette.ToColor(color);
+
+            EnsureOutline();
+            if (_spriteRenderer != null)
+            {
+                _spriteRenderer.color = ColorPalette.ToColor(color);
+                _spriteRenderer.enabled = true;
+            }
+
+            if (_outlineRenderer != null)
+            {
+                _outlineRenderer.sprite = _spriteRenderer != null ? _spriteRenderer.sprite : _outlineRenderer.sprite;
+                _outlineRenderer.color = _outlineColor;
+                _outlineRenderer.enabled = true;
+                _outlineRenderer.transform.localScale = Vector3.one * _outlineScale;
+                _outlineRenderer.sortingOrder = (_spriteRenderer != null ? _spriteRenderer.sortingOrder : 0) - 1;
+            }
         }
 
         /// <summary>
@@ -74,6 +95,42 @@ namespace PixelFlowClone.Entities
             IsConsumed = false;
             transform.localScale = Vector3.one;
             if (_collider != null) _collider.enabled = true;
+            if (_spriteRenderer != null) _spriteRenderer.enabled = true;
+            if (_outlineRenderer != null) _outlineRenderer.enabled = true;
+        }
+
+        private void EnsureOutline()
+        {
+            if (_spriteRenderer == null)
+                return;
+
+            if (_outlineRenderer != null)
+            {
+                if (_outlineRenderer.sprite == null)
+                    _outlineRenderer.sprite = _spriteRenderer.sprite;
+                return;
+            }
+
+            Transform existing = transform.Find("Outline");
+            if (existing != null)
+            {
+                _outlineRenderer = existing.GetComponent<SpriteRenderer>();
+                if (_outlineRenderer == null)
+                    _outlineRenderer = existing.gameObject.AddComponent<SpriteRenderer>();
+            }
+            else
+            {
+                var go = new GameObject("Outline");
+                go.transform.SetParent(transform, false);
+                go.transform.localPosition = Vector3.zero;
+                go.transform.localRotation = Quaternion.identity;
+                _outlineRenderer = go.AddComponent<SpriteRenderer>();
+            }
+
+            _outlineRenderer.sprite = _spriteRenderer.sprite;
+            _outlineRenderer.color = _outlineColor;
+            _outlineRenderer.sortingOrder = _spriteRenderer.sortingOrder - 1;
+            _outlineRenderer.transform.localScale = Vector3.one * _outlineScale;
         }
     }
 }

@@ -12,16 +12,16 @@ namespace PixelFlowClone.Data
         {
             return id switch
             {
-                ColorId.Red => new Color(0.90f, 0.22f, 0.22f),
-                ColorId.Blue => new Color(0.20f, 0.45f, 0.90f),
-                ColorId.Green => new Color(0.24f, 0.74f, 0.34f),
-                ColorId.Yellow => new Color(0.96f, 0.82f, 0.18f),
-                ColorId.Purple => new Color(0.60f, 0.30f, 0.80f),
-                ColorId.Orange => new Color(0.96f, 0.55f, 0.15f),
-                ColorId.Pink => new Color(0.95f, 0.45f, 0.70f),
-                ColorId.Black => new Color(0.12f, 0.12f, 0.14f),
-                ColorId.White => new Color(0.95f, 0.95f, 0.95f),
-                ColorId.Brown => new Color(0.55f, 0.32f, 0.14f),
+                ColorId.Red => new Color(0.95f, 0.28f, 0.32f),
+                ColorId.Blue => new Color(0.25f, 0.78f, 0.95f),
+                ColorId.Green => new Color(0.30f, 0.86f, 0.42f),
+                ColorId.Yellow => new Color(1.00f, 0.88f, 0.22f),
+                ColorId.Purple => new Color(0.70f, 0.38f, 0.92f),
+                ColorId.Orange => new Color(1.00f, 0.62f, 0.20f),
+                ColorId.Pink => new Color(1.00f, 0.48f, 0.72f),
+                ColorId.Black => new Color(0.14f, 0.14f, 0.16f),
+                ColorId.White => new Color(0.96f, 0.96f, 0.97f),
+                ColorId.Brown => new Color(0.62f, 0.38f, 0.18f),
                 _ => Color.clear
             };
         }

@@ -5,6 +5,7 @@ using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.Managers;
 using PixelFlowClone.Queue;
+using PixelFlowClone.Utils;
 using TMPro;
 using UnityEngine;
 
@@ -521,6 +522,7 @@ namespace PixelFlowClone.Entities
             if (!canShoot)
                 return;
 
+            ColorId blockColor = hitBlock.Color;
             if (!GridManager.Instance.TryConsumeBlock(Color, hitBlock.GridPosition))
                 return;
 
@@ -528,7 +530,10 @@ namespace PixelFlowClone.Entities
             _faceInwardForRestOfLap = true;
             ApplyFacingFromMoveDirection(shootDirection);
 
-            Capacity = Mathf.Max(0, Capacity - 1);
+            if (!CapacityLogic.TryConsume(Capacity, Color, blockColor, out int newCapacity))
+                return;
+
+            Capacity = newCapacity;
             RefreshCapacityLabel();
 
             if (Capacity == 0)

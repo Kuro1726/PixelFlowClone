@@ -971,6 +971,7 @@ MonoBehaviour:
   _playfieldCenter: {x: 0, y: 0}
   _playfieldSize: {x: 5, y: 5}
   _referenceCellSize: 1
+  _blockPackScale: 1.14
 --- !u!1 &8494278113136546594
 GameObject:
   m_ObjectHideFlags: 0

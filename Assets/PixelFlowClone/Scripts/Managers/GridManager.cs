@@ -23,6 +23,8 @@ namespace PixelFlowClone.Managers
         [SerializeField] private Vector2 _playfieldSize = new(5f, 5f);
         [Tooltip("Prefab block scale 1 corresponds to this cell size (world units).")]
         [SerializeField] private float _referenceCellSize = 1f;
+        [Tooltip("Extra scale so fills overlap slightly and hide inner outlines (Pixel Flow pack).")]
+        [SerializeField] [Range(1f, 1.25f)] private float _blockPackScale = 1.14f;
 
         private readonly Dictionary<Vector2Int, PixelBlock> _blocks = new();
         private LevelDataSO _currentLevel;
@@ -77,7 +79,7 @@ namespace PixelFlowClone.Managers
             EnsureGridRoot();
             RecalculateRuntimeLayout(level);
 
-            float scale = _runtimeBlockScale;
+            float scale = _runtimeBlockScale * Mathf.Max(1f, _blockPackScale);
 
             for (int y = 0; y < level.GridSize.y; y++)
             {
