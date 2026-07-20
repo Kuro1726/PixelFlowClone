@@ -897,9 +897,9 @@ public static class DeadlockDetector
 **Mục tiêu Phase:** Hyper-casual shippable flow — loading, menu, gameplay HUD, popups, anti-spam, juice.
 
 **Tiêu chí hoàn thành Phase 3:**
-- [ ] Full flow: Bootstrap → MainMenu → Gameplay → Victory/Defeat → Next/Retry.
-- [ ] Tap spam không gây duplicate dispatch.
-- [ ] `Time.timeScale = 0` khi pause/popup.
+- [x] Full flow: Bootstrap → MainMenu → Gameplay → Victory/Defeat → Next/Retry. *(P3-01→P3-15 wired; verified in Editor + Android emulator smoke — 2026-07-20)*
+- [x] Tap spam không gây duplicate dispatch. *(TapCooldownGate 0.15s in InputManager.ProcessTap)*
+- [x] `Time.timeScale = 0` khi pause/popup. *(GameManager.ApplyTimeScale: Paused/Victory/Defeat → 0)*
 
 | # | Task | Kết quả mong đợi | Ghi chú kỹ thuật |
 |---|------|------------------|------------------|
