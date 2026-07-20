@@ -2,6 +2,7 @@ using System;
 using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.Managers;
+using PixelFlowClone.Utils;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -41,6 +42,7 @@ namespace PixelFlowClone.UI.Screens
                 RebuildUi();
             else
                 WirePauseButton();
+            ApplyGameplayFonts();
             RefreshLevelLabel();
             RefreshConveyorIndicator();
         }
@@ -118,6 +120,7 @@ namespace PixelFlowClone.UI.Screens
             DestroyChildIfExists(canvasRoot, "QueueCaption");
 
             BuildRuntimeUi();
+            ApplyGameplayFonts();
             WirePauseButton();
             RefreshLevelLabel();
             RefreshPauseLabel();
@@ -130,6 +133,12 @@ namespace PixelFlowClone.UI.Screens
                    _pauseButton != null &&
                    _levelLabel != null &&
                    _conveyorLabel != null;
+        }
+
+        private void ApplyGameplayFonts()
+        {
+            GameplayFontUtility.Apply(_conveyorLabel);
+            GameplayFontUtility.Apply(_levelLabel);
         }
 
 #if UNITY_EDITOR

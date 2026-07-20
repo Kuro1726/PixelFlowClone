@@ -13,4 +13,5 @@ MonoBehaviour:
   m_Name: ConveyorPath_Level01
   m_EditorClassIdentifier: 
   EntryWaypointIndex: 0
+  LapCompleteWaypointIndex: 23
   MoveSpeed: 0

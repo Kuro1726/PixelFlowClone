@@ -180,7 +180,7 @@ namespace PixelFlowClone.Core
                 return;
 
             _defeatPopup = DefeatPopup.CreateRuntime(ResolveHudCanvasRoot());
-            Debug.Log("[GameplayContext] Spawned runtime DefeatPopup.");
+            Debug.Log("[GameplayContext] Spawned runtime DefeatPopup because none was assigned in the Hierarchy.");
         }
 
         private void EnsurePausePopup()
@@ -191,8 +191,8 @@ namespace PixelFlowClone.Core
             if (_pausePopup != null)
                 return;
 
-            _pausePopup = PausePopup.CreateRuntime(ResolveHudCanvasRoot());
-            Debug.Log("[GameplayContext] Spawned runtime PausePopup.");
+            _pausePopup = PausePopup.Create(ResolveHudCanvasRoot());
+            Debug.Log("[GameplayContext] Spawned PausePopup.");
         }
 
         private void EnsureConsumeVfx()

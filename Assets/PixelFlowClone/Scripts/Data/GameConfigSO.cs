@@ -40,6 +40,14 @@ namespace PixelFlowClone.Data
         [Min(0.25f)]
         public float ConveyorPathMargin = 1.5f;
 
+        [Tooltip("Corner radius of the ConveyorPath in world units.")]
+        [Min(0.01f)]
+        public float ConveyorCornerRadius = 0.9f;
+
+        [Tooltip("Number of samples used for each 90-degree corner. Higher values make turns smoother.")]
+        [Range(2, 12)]
+        public int ConveyorCornerSegments = 5;
+
         [Tooltip("Khoảng từ đáy conveyor xuống hàng queue (world units).")]
         [Min(0.01f)]
         public float QueueGapBelowPath = 0.9f;
@@ -50,7 +58,7 @@ namespace PixelFlowClone.Data
 
         [Tooltip("Khoảng cách giữa các CollectorUnit trên hàng queue.")]
         [Min(0.01f)]
-        public float QueueUnitSpacing = 1.5f;
+        public float QueueUnitSpacing = 1.6f;
 
         [Tooltip("Khoảng cách giữa các CollectorUnit trong 1 cột waiting (dọc).")]
         [Min(0.01f)]

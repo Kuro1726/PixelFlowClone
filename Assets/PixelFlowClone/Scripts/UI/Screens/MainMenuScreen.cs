@@ -19,6 +19,8 @@ namespace PixelFlowClone.UI.Screens
     {
         public const string DefaultTitle = "Pixel Flow";
 
+        [SerializeField] private Sprite _backgroundSprite;
+        [SerializeField] private Sprite _playButtonSprite;
         [SerializeField] private TMP_Text _titleText;
         [SerializeField] private Button _playButton;
         [SerializeField] private Button _instructionsButton;
@@ -63,6 +65,43 @@ namespace PixelFlowClone.UI.Screens
         public void Show() => gameObject.SetActive(true);
 
         public void Hide() => gameObject.SetActive(false);
+
+        /// <summary>
+        /// Creates the complete UI hierarchy so it can be edited and serialized in the
+        /// Unity Editor instead of only being generated when Play Mode starts.
+        /// </summary>
+        public void BuildEditableUi()
+        {
+            if (_playButton == null || _instructionsButton == null || _settingsButton == null)
+                BuildRuntimeUi();
+
+            EnsureSettingsPopup();
+            if (_settingsPopup != null)
+                _settingsPopup.BuildEditableUi();
+        }
+
+        /// <summary>
+        /// Supplies artwork when an editor utility creates this screen from scratch.
+        /// Existing scene instances normally keep these values through serialization.
+        /// </summary>
+        public void SetArtwork(Sprite backgroundSprite, Sprite playButtonSprite)
+        {
+            _backgroundSprite = backgroundSprite;
+            _playButtonSprite = playButtonSprite;
+        }
+
+        [ContextMenu("Make Main Menu Editable")]
+        private void MakeMainMenuEditableFromComponentMenu()
+        {
+            if (Application.isPlaying)
+            {
+                Debug.LogWarning("[MainMenu] Exit Play Mode before creating the editable UI hierarchy.", this);
+                return;
+            }
+
+            BuildEditableUi();
+            Debug.Log("[MainMenu] Editable UI hierarchy created. Save SCN_MainMenu (Ctrl+S).", this);
+        }
 
         private void RegisterWithUIManager()
         {
@@ -380,6 +419,13 @@ namespace PixelFlowClone.UI.Screens
 
             Image backdrop = CreateImage(root, "Backdrop", new Color(0.1f, 0.12f, 0.16f, 1f));
             StretchFull(backdrop.rectTransform);
+            if (_backgroundSprite != null)
+            {
+                backdrop.sprite = _backgroundSprite;
+                backdrop.type = Image.Type.Simple;
+                backdrop.preserveAspect = false;
+                backdrop.color = Color.white;
+            }
 
             _titleText = CreateLabel(root, "Title", _title, 72f, FontStyles.Bold);
             _titleText.rectTransform.anchorMin = new Vector2(0.1f, 0.72f);
@@ -393,7 +439,8 @@ namespace PixelFlowClone.UI.Screens
             StretchFull(_mainButtonsRoot);
 
             _playButton = CreateMenuButton(
-                _mainButtonsRoot, "PlayButton", "Play", new Vector2(0.2f, 0.48f), new Vector2(0.8f, 0.58f));
+                _mainButtonsRoot, "PlayButton", "Play", new Vector2(0.2f, 0.455f), new Vector2(0.8f, 0.58f));
+            ApplyPlayButtonArtwork(_playButton, _playButtonSprite);
             _instructionsButton = CreateMenuButton(
                 _mainButtonsRoot, "InstructionsButton", "Instructions", new Vector2(0.2f, 0.36f), new Vector2(0.8f, 0.46f));
             _settingsButton = CreateMenuButton(
@@ -409,6 +456,51 @@ namespace PixelFlowClone.UI.Screens
                 _levelSelectRoot, "BackButton", "Back", new Vector2(0.2f, 0.12f), new Vector2(0.8f, 0.20f));
 
             EnsureSettingsPopup();
+        }
+
+        private static void ApplyPlayButtonArtwork(Button button, Sprite artworkSprite)
+        {
+            if (button == null || artworkSprite == null)
+                return;
+
+            Image hitArea = button.GetComponent<Image>();
+            if (hitArea != null)
+            {
+                hitArea.sprite = null;
+                hitArea.color = Color.clear;
+            }
+
+            Image artwork = CreateImage(button.transform, "Artwork", Color.white);
+            artwork.sprite = artworkSprite;
+            artwork.type = Image.Type.Simple;
+            artwork.preserveAspect = true;
+            artwork.raycastTarget = false;
+
+            // The generated PNG contains transparent padding. This size makes its visible
+            // 1121x415 alpha bounds fill the 648x240 Play button without stretching.
+            RectTransform artworkRect = artwork.rectTransform;
+            artworkRect.anchorMin = new Vector2(0.5f, 0.5f);
+            artworkRect.anchorMax = new Vector2(0.5f, 0.5f);
+            artworkRect.anchoredPosition = Vector2.zero;
+            artworkRect.sizeDelta = new Vector2(888f, 592f);
+            artwork.transform.SetAsFirstSibling();
+
+            button.targetGraphic = artwork;
+            ColorBlock colors = button.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1f, 0.98f, 0.85f, 1f);
+            colors.pressedColor = new Color(0.9f, 0.78f, 0.42f, 1f);
+            colors.selectedColor = Color.white;
+            button.colors = colors;
+
+            TMP_Text label = button.transform.Find("Label")?.GetComponent<TMP_Text>();
+            if (label != null)
+            {
+                label.fontSize = 64f;
+                label.fontStyle = FontStyles.Bold;
+                label.color = Color.white;
+                label.transform.SetAsLastSibling();
+            }
         }
 
         private static Button CreateMenuButton(

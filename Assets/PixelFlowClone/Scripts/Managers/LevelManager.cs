@@ -21,7 +21,8 @@ namespace PixelFlowClone.Managers
 
         [SerializeField] private LevelDataSO[] _levels;
         [SerializeField] private bool _loadSavedLevelOnStart = true;
-        [SerializeField] private float _gameplayLoadMinSeconds = 0.75f;
+        [Tooltip("Minimum time the loading screen remains visible for gameplay/menu transitions.")]
+        [SerializeField, Min(0f)] private float _gameplayLoadMinSeconds = 3f;
 
         private Coroutine _playRoutine;
 
@@ -257,7 +258,7 @@ namespace PixelFlowClone.Managers
             yield return SceneLoader.LoadAsync(
                 SceneLoader.MainMenuSceneName,
                 loading.SetProgress,
-                minDurationSeconds: 0.35f);
+                minDurationSeconds: Mathf.Max(0f, _gameplayLoadMinSeconds));
 
             if (loading != null)
                 Destroy(loading.gameObject);

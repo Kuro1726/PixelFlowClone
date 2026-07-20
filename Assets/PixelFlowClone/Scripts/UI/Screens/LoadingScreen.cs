@@ -15,6 +15,7 @@ namespace PixelFlowClone.UI.Screens
         private const string BackgroundResourcePath = "Backgrounds/Background_loading";
         private const string LogoResourcePath = "Logos/Logo";
         private const string LoadingFontResourcePath = "Fonts/LilitaOne_SDF";
+        private const string LoadingTextMaterialResourcePath = "Fonts/LilitaOne_Loading";
         private const string PrefabResourcePath = "UI/PF_LoadingScreen";
 
         private static readonly string[] LoadingBlockResourcePaths =
@@ -150,6 +151,7 @@ namespace PixelFlowClone.UI.Screens
         public static LoadingScreen CreateRuntime(Transform parent = null)
         {
             var root = new GameObject("PF_LoadingScreen", typeof(RectTransform));
+            root.transform.localScale = Vector3.one;
             if (parent != null)
                 root.transform.SetParent(parent, false);
 
@@ -164,6 +166,7 @@ namespace PixelFlowClone.UI.Screens
             TMP_FontAsset loadingFont = Resources.Load<TMP_FontAsset>(LoadingFontResourcePath);
             if (loadingFont == null)
                 Debug.LogWarning($"[LoadingScreen] Font was not found at Resources/{LoadingFontResourcePath}.");
+            Material loadingTextMaterial = Resources.Load<Material>(LoadingTextMaterialResourcePath);
 
             RawImage backdrop = CreateBackground(root.transform);
             StretchFull(backdrop.rectTransform);
@@ -173,10 +176,10 @@ namespace PixelFlowClone.UI.Screens
             RawImage logo = CreateLogo(root.transform);
             if (logo != null)
             {
-                logo.rectTransform.anchorMin = new Vector2(0.08f, 0.43f);
-                logo.rectTransform.anchorMax = new Vector2(0.92f, 0.87f);
-                logo.rectTransform.offsetMin = Vector2.zero;
-                logo.rectTransform.offsetMax = Vector2.zero;
+                logo.rectTransform.anchorMin = new Vector2(0.5f, 0.65f);
+                logo.rectTransform.anchorMax = new Vector2(0.5f, 0.65f);
+                logo.rectTransform.anchoredPosition = Vector2.zero;
+                logo.rectTransform.sizeDelta = new Vector2(850f, 850f);
             }
 
             TMP_Text title = CreateLabel(
@@ -197,14 +200,23 @@ namespace PixelFlowClone.UI.Screens
                 "Status",
                 DefaultStatus,
                 80f,
-                FontStyles.Normal,
+                FontStyles.Bold,
                 loadingFont);
             status.rectTransform.anchorMin = new Vector2(0.1f, 0.34f);
             status.rectTransform.anchorMax = new Vector2(0.9f, 0.4f);
             status.rectTransform.offsetMin = Vector2.zero;
             status.rectTransform.offsetMax = Vector2.zero;
-            status.outlineColor = new Color32(101, 0, 135, 255);
-            status.outlineWidth = 0.24f;
+            if (loadingTextMaterial != null)
+            {
+                status.fontSharedMaterial = loadingTextMaterial;
+            }
+            else
+            {
+                status.outlineColor = new Color32(101, 0, 135, 255);
+                status.outlineWidth = 0.2f;
+                Debug.LogWarning(
+                    $"[LoadingScreen] Text material was not found at Resources/{LoadingTextMaterialResourcePath}.");
+            }
 
             LoadingScreen screen = root.AddComponent<LoadingScreen>();
             screen._canvasGroup = group;
@@ -287,9 +299,6 @@ namespace PixelFlowClone.UI.Screens
             image.color = Color.white;
             image.raycastTarget = false;
 
-            AspectRatioFitter fitter = go.AddComponent<AspectRatioFitter>();
-            fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-            fitter.aspectRatio = (float)texture.width / texture.height;
             return image;
         }
 

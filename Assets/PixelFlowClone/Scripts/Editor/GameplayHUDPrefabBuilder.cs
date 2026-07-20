@@ -24,6 +24,8 @@ namespace PixelFlowClone.Editor
         private const string VictoryTrophyPath = "Assets/PixelFlowClone/Art/UI/Popups/Victory/Trophy.png";
         private const string VictoryTrophyWingPath = "Assets/PixelFlowClone/Art/UI/Popups/Victory/TrophyWing.png";
         private const string VictoryContinueButtonPath = "Assets/PixelFlowClone/Art/UI/Popups/Victory/ContinueButton.png";
+        private const string DefeatPanelPath =
+            "Assets/PixelFlowClone/Art/Resources/UI/Popups/Defeat/DefeatPanel_Cutout.png";
 
         [InitializeOnLoadMethod]
         private static void BuildEditableHudWhenMissing()
@@ -44,14 +46,28 @@ namespace PixelFlowClone.Editor
             if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling)
                 return;
 
+            ConfigureDefeatPanelImporter();
+
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
             if (prefab != null)
             {
-                VictoryPopup popup = prefab.GetComponentInChildren<VictoryPopup>(true);
-                if (popup != null)
+                VictoryPopup victoryPopup = prefab.GetComponentInChildren<VictoryPopup>(true);
+                if (victoryPopup != null)
                 {
-                    if (popup.NeedsPresentationUpgrade)
+                    if (victoryPopup.NeedsPresentationUpgrade)
                         UpgradeVictoryPopupPresentation();
+
+                    PausePopup pausePopup = prefab.GetComponentInChildren<PausePopup>(true);
+                    if (pausePopup == null || !pausePopup.UsesDirectHeaderEditing)
+                        UpgradeOrEmbedPausePopup();
+
+                    DefeatPopup defeatPopup = prefab.GetComponentInChildren<DefeatPopup>(true);
+                    if (defeatPopup == null ||
+                        !defeatPopup.UsesDefeatPanelArtwork ||
+                        !defeatPopup.HasMainMenuButton ||
+                        !defeatPopup.UsesRestartLevelButtonArtwork ||
+                        !defeatPopup.UsesMainMenuCloseButtonArtwork)
+                        EmbedDefeatPopup();
                     return;
                 }
             }
@@ -59,6 +75,27 @@ namespace PixelFlowClone.Editor
             BuildGameplayHUDPrefab();
         }
 
+        private static void ConfigureDefeatPanelImporter()
+        {
+            TextureImporter importer = AssetImporter.GetAtPath(DefeatPanelPath) as TextureImporter;
+            if (importer == null)
+                return;
+
+            bool needsReimport = importer.textureType != TextureImporterType.Sprite ||
+                                 importer.spriteImportMode != SpriteImportMode.Single ||
+                                 importer.mipmapEnabled ||
+                                 !importer.alphaIsTransparency ||
+                                 importer.npotScale != TextureImporterNPOTScale.None;
+            if (!needsReimport)
+                return;
+
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.mipmapEnabled = false;
+            importer.alphaIsTransparency = true;
+            importer.npotScale = TextureImporterNPOTScale.None;
+            importer.SaveAndReimport();
+        }
         private static void UpgradeVictoryPopupPresentation()
         {
             GameObject contents = PrefabUtility.LoadPrefabContents(PrefabPath);
@@ -73,6 +110,53 @@ namespace PixelFlowClone.Editor
                 PrefabUtility.SaveAsPrefabAsset(contents, PrefabPath);
                 AssetDatabase.SaveAssets();
                 Debug.Log("[PixelFlowClone] Victory Popup presentation upgraded.");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
+            }
+        }
+
+        private static void UpgradeOrEmbedPausePopup()
+        {
+            GameObject contents = PrefabUtility.LoadPrefabContents(PrefabPath);
+            try
+            {
+                PausePopup popup = contents.GetComponentInChildren<PausePopup>(true);
+                if (popup == null)
+                    popup = CreatePausePopup(contents.transform);
+                else
+                {
+                    popup.BuildEditableUi();
+                    popup.EnsureDirectHeaderEditing();
+                }
+
+                EditorUtility.SetDirty(popup);
+                PrefabUtility.SaveAsPrefabAsset(contents, PrefabPath);
+                AssetDatabase.SaveAssets();
+                Debug.Log("[PixelFlowClone] PausePopup embedded as an editable PF_GameplayHUD GameObject.");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
+            }
+        }
+
+        private static void EmbedDefeatPopup()
+        {
+            GameObject contents = PrefabUtility.LoadPrefabContents(PrefabPath);
+            try
+            {
+                DefeatPopup popup = contents.GetComponentInChildren<DefeatPopup>(true);
+                if (popup == null)
+                    popup = CreateDefeatPopup(contents.transform);
+                else
+                    popup.BuildEditableUi();
+
+                EditorUtility.SetDirty(popup);
+                PrefabUtility.SaveAsPrefabAsset(contents, PrefabPath);
+                AssetDatabase.SaveAssets();
+                Debug.Log("[PixelFlowClone] DefeatPopup embedded as an editable PF_GameplayHUD GameObject.");
             }
             finally
             {
@@ -114,7 +198,9 @@ namespace PixelFlowClone.Editor
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
             if (prefab == null ||
                 prefab.GetComponent<GameplayHUD>() == null ||
-                prefab.GetComponentInChildren<VictoryPopup>(true) == null)
+                prefab.GetComponentInChildren<VictoryPopup>(true) == null ||
+                prefab.GetComponentInChildren<PausePopup>(true) == null ||
+                prefab.GetComponentInChildren<DefeatPopup>(true) == null)
             {
                 GameplayHUD temp = CreateEditableHud();
                 PrefabUtility.SaveAsPrefabAsset(temp.gameObject, PrefabPath);
@@ -220,6 +306,8 @@ namespace PixelFlowClone.Editor
             AssignHudSprites(hud);
             hud.BuildForEditor();
             CreateVictoryPopup(hud.transform);
+            CreatePausePopup(hud.transform);
+            CreateDefeatPopup(hud.transform);
             return hud;
         }
 
@@ -235,6 +323,24 @@ namespace PixelFlowClone.Editor
             popup.name = "VictoryPopup";
             popup.BuildForEditor();
             popup.gameObject.SetActive(true);
+        }
+
+        private static PausePopup CreatePausePopup(Transform parent)
+        {
+            PausePopup popup = PausePopup.CreateRuntime(parent);
+            popup.name = "PausePopup";
+            popup.BuildEditableUi();
+            popup.gameObject.SetActive(true);
+            return popup;
+        }
+
+        private static DefeatPopup CreateDefeatPopup(Transform parent)
+        {
+            DefeatPopup popup = DefeatPopup.CreateRuntime(parent);
+            popup.name = "DefeatPopup";
+            popup.BuildEditableUi();
+            popup.gameObject.SetActive(true);
+            return popup;
         }
 
         private static Sprite LoadSprite(string path, string label)

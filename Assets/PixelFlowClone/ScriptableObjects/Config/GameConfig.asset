@@ -29,13 +29,15 @@ MonoBehaviour:
   CollectorPoolPrewarm: 20
   BlockPoolPrewarm: 100
   ConveyorPathMargin: 2
+  ConveyorCornerRadius: 0.9
+  ConveyorCornerSegments: 5
   QueueGapBelowPath: 2
   WaitingGapBelowQueue: 2
-  QueueUnitSpacing: 1.5
+  QueueUnitSpacing: 1.6
   WaitingUnitSpacing: 1.5
   WaitingColumnSpacing: 1.5
   GameplayScreenScale: 1.6
-  CameraTopPad: 5
+  CameraTopPad: 5.3
   CameraWaitingStackDepth: 4.75
   CameraPadding: 0.35
   CameraHudScreenFraction: 0.1295

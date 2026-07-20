@@ -267,8 +267,8 @@ MonoBehaviour:
   _loadMainMenuOnStart: 1
   _nextSceneName: SCN_MainMenu
   _loadingScreen: {fileID: 0}
-  _loadingScreenPrefab: {fileID: 0}
-  _minLoadingSeconds: 3.5
+  _loadingScreenPrefab: {fileID: 6158792567917567232, guid: e0a7990ba83db254bad2ee181702c28d, type: 3}
+  _minLoadingSeconds: 4.5
 --- !u!1 &300000001
 GameObject:
   m_ObjectHideFlags: 0
@@ -364,7 +364,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 96eada0f4bd7b574e873d110bd769b39, type: 2}
   - {fileID: 11400000, guid: 90bbb307ecb4e8c47930135b8bacf7e5, type: 2}
   _loadSavedLevelOnStart: 0
-  _gameplayLoadMinSeconds: 0.75
+  _gameplayLoadMinSeconds: 3
 --- !u!1 &500000001
 GameObject:
   m_ObjectHideFlags: 0

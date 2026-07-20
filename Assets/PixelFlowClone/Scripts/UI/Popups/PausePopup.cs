@@ -1,8 +1,10 @@
 using System;
+using PixelFlowClone.Data;
 using PixelFlowClone.Managers;
 using PixelFlowClone.UI;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace PixelFlowClone.UI.Popups
@@ -13,28 +15,69 @@ namespace PixelFlowClone.UI.Popups
     /// </summary>
     public class PausePopup : MonoBehaviour
     {
+        private const string PausePanelResourcePath = "UI/Popups/Pause/PausePanel_Cutout";
+        private const string RestartButtonResourcePath =
+            "UI/Popups/Pause/RestartLevelButton_Cutout";
+        private const string HomeButtonResourcePath =
+            "UI/Popups/Pause/ReturnHomeButton_Cutout";
+        private const string CloseButtonResourcePath =
+            "UI/Popups/Pause/CloseButton_Cutout";
+        private const string PrefabResourcePath = "UI/PF_PausePopup";
+
         [SerializeField] private CanvasGroup _canvasGroup;
-        [SerializeField] private Button _resumeButton;
+        [FormerlySerializedAs("_resumeButton")]
+        [SerializeField] private Button _closeButton;
         [SerializeField] private Button _restartButton;
         [SerializeField] private Button _homeButton;
         [SerializeField] private TMP_Text _titleLabel;
+        [SerializeField] private Button _audioToggleButton;
+        [SerializeField] private TMP_Text _audioToggleLabel;
+        [SerializeField] private Button _hapticToggleButton;
+        [SerializeField] private TMP_Text _hapticToggleLabel;
 
         public event Action ResumeClicked;
         public event Action RestartClicked;
         public event Action HomeClicked;
 
+        public bool HasSettingsControls =>
+            _audioToggleButton != null && _hapticToggleButton != null;
+        public bool HasRestartArtwork =>
+            _restartButton != null && _restartButton.GetComponent<Image>()?.sprite != null;
+        public bool HasHomeArtwork =>
+            _homeButton != null && _homeButton.GetComponent<Image>()?.sprite != null;
+        public bool HasCloseArtwork =>
+            _closeButton != null &&
+            _closeButton.name == "CloseButton" &&
+            _closeButton.GetComponent<Image>()?.sprite != null;
+        public bool UsesDirectHeaderEditing => transform.Find("Panel/HeaderRoot") == null;
+
         private void Awake()
         {
-            if (_resumeButton == null || _restartButton == null || _homeButton == null)
+            if (_closeButton == null || _restartButton == null || _homeButton == null)
                 BuildRuntimeUi();
 
+            EnsureSettingsControls();
+            ApplyRestartButtonArtwork();
+            ApplyHomeButtonArtwork();
+            ApplyCloseButtonArtwork();
+            EnsureDirectHeaderEditing();
             EnsureCanvasGroup();
             WireButtons();
+            RefreshSettingsLabels();
             Hide();
+        }
+
+        private void OnEnable()
+        {
+            GameSettings.SettingsChanged -= RefreshSettingsLabels;
+            GameSettings.SettingsChanged += RefreshSettingsLabels;
+            WireButtons();
+            RefreshSettingsLabels();
         }
 
         private void OnDisable()
         {
+            GameSettings.SettingsChanged -= RefreshSettingsLabels;
             UnwireButtons();
         }
 
@@ -42,6 +85,7 @@ namespace PixelFlowClone.UI.Popups
         {
             if (UIManager.HasInstance)
                 UIManager.Instance.UnregisterPopup(PopupId.Pause, this);
+            GameSettings.SettingsChanged -= RefreshSettingsLabels;
             UnwireButtons();
         }
 
@@ -62,6 +106,21 @@ namespace PixelFlowClone.UI.Popups
             _canvasGroup.interactable = false;
         }
 
+        /// <summary>Builds and serializes the hierarchy for prefab editing.</summary>
+        public void BuildEditableUi()
+        {
+            if (_closeButton == null || _restartButton == null || _homeButton == null)
+                BuildRuntimeUi();
+
+            EnsureSettingsControls();
+            ApplyRestartButtonArtwork();
+            ApplyHomeButtonArtwork();
+            ApplyCloseButtonArtwork();
+            EnsureDirectHeaderEditing();
+            EnsureCanvasGroup();
+            RefreshSettingsLabels();
+        }
+
         private void EnsureCanvasGroup()
         {
             if (_canvasGroup == null)
@@ -72,10 +131,10 @@ namespace PixelFlowClone.UI.Popups
 
         private void WireButtons()
         {
-            if (_resumeButton != null)
+            if (_closeButton != null)
             {
-                _resumeButton.onClick.RemoveListener(HandleResumeClicked);
-                _resumeButton.onClick.AddListener(HandleResumeClicked);
+                _closeButton.onClick.RemoveListener(HandleResumeClicked);
+                _closeButton.onClick.AddListener(HandleResumeClicked);
             }
 
             if (_restartButton != null)
@@ -89,16 +148,66 @@ namespace PixelFlowClone.UI.Popups
                 _homeButton.onClick.RemoveListener(HandleHomeClicked);
                 _homeButton.onClick.AddListener(HandleHomeClicked);
             }
+
+            if (_audioToggleButton != null)
+            {
+                _audioToggleButton.onClick.RemoveListener(HandleAudioClicked);
+                _audioToggleButton.onClick.AddListener(HandleAudioClicked);
+            }
+
+            if (_hapticToggleButton != null)
+            {
+                _hapticToggleButton.onClick.RemoveListener(HandleHapticClicked);
+                _hapticToggleButton.onClick.AddListener(HandleHapticClicked);
+            }
         }
 
         private void UnwireButtons()
         {
-            if (_resumeButton != null)
-                _resumeButton.onClick.RemoveListener(HandleResumeClicked);
+            if (_closeButton != null)
+                _closeButton.onClick.RemoveListener(HandleResumeClicked);
             if (_restartButton != null)
                 _restartButton.onClick.RemoveListener(HandleRestartClicked);
             if (_homeButton != null)
                 _homeButton.onClick.RemoveListener(HandleHomeClicked);
+            if (_audioToggleButton != null)
+                _audioToggleButton.onClick.RemoveListener(HandleAudioClicked);
+            if (_hapticToggleButton != null)
+                _hapticToggleButton.onClick.RemoveListener(HandleHapticClicked);
+        }
+
+        private void HandleAudioClicked()
+        {
+            GameSettings.ToggleAudio();
+            RefreshSettingsLabels();
+        }
+
+        private void HandleHapticClicked()
+        {
+            GameSettings.ToggleHaptic();
+            RefreshSettingsLabels();
+            if (GameSettings.HapticEnabled)
+                GameSettings.TryHaptic();
+        }
+
+        private void RefreshSettingsLabels()
+        {
+            if (_audioToggleLabel != null)
+                _audioToggleLabel.text = GameSettings.AudioEnabled ? "Sound: ON" : "Sound: OFF";
+            if (_hapticToggleLabel != null)
+                _hapticToggleLabel.text = GameSettings.HapticEnabled ? "Haptic: ON" : "Haptic: OFF";
+
+            ApplyToggleColor(_audioToggleButton, GameSettings.AudioEnabled);
+            ApplyToggleColor(_hapticToggleButton, GameSettings.HapticEnabled);
+        }
+
+        private static void ApplyToggleColor(Button button, bool enabled)
+        {
+            Image image = button != null ? button.GetComponent<Image>() : null;
+            if (image != null)
+                image.color = enabled
+                    ? new Color(0.25f, 0.72f, 0.42f, 1f)
+                    : new Color(0.42f, 0.38f, 0.48f, 1f);
         }
 
         private void HandleResumeClicked()
@@ -156,6 +265,24 @@ namespace PixelFlowClone.UI.Popups
         /// <summary>
         /// Builds a pause overlay under <paramref name="parent"/> (typically the gameplay HUD canvas).
         /// </summary>
+        public static PausePopup Create(Transform parent)
+        {
+            if (parent == null)
+                throw new ArgumentNullException(nameof(parent));
+
+            PausePopup prefab = Resources.Load<PausePopup>(PrefabResourcePath);
+            if (prefab == null)
+            {
+                Debug.LogWarning(
+                    $"[PausePopup] Prefab was not found at Resources/{PrefabResourcePath}; using runtime UI.");
+                return CreateRuntime(parent);
+            }
+
+            PausePopup instance = Instantiate(prefab, parent, false);
+            instance.name = "PausePopup";
+            return instance;
+        }
+
         public static PausePopup CreateRuntime(Transform parent)
         {
             if (parent == null)
@@ -180,11 +307,25 @@ namespace PixelFlowClone.UI.Popups
             dim.raycastTarget = true;
 
             Image panel = CreateImage(transform, "Panel", new Color(0.12f, 0.14f, 0.18f, 1f));
-            panel.rectTransform.anchorMin = new Vector2(0.14f, 0.28f);
-            panel.rectTransform.anchorMax = new Vector2(0.86f, 0.72f);
-            panel.rectTransform.offsetMin = Vector2.zero;
-            panel.rectTransform.offsetMax = Vector2.zero;
+            panel.rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+            panel.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            panel.rectTransform.anchoredPosition = Vector2.zero;
+            panel.rectTransform.sizeDelta = new Vector2(820f, 1230f);
             panel.raycastTarget = true;
+
+            Sprite panelSprite = Resources.Load<Sprite>(PausePanelResourcePath);
+            if (panelSprite != null)
+            {
+                panel.sprite = panelSprite;
+                panel.type = Image.Type.Simple;
+                panel.preserveAspect = false;
+                panel.color = Color.white;
+            }
+            else
+            {
+                Debug.LogWarning(
+                    $"[PausePopup] Panel sprite was not found at Resources/{PausePanelResourcePath}.");
+            }
 
             _titleLabel = CreateLabel(panel.transform, "Title", "Paused", 52f, FontStyles.Bold);
             _titleLabel.rectTransform.anchorMin = new Vector2(0.08f, 0.78f);
@@ -192,10 +333,11 @@ namespace PixelFlowClone.UI.Popups
             _titleLabel.rectTransform.offsetMin = Vector2.zero;
             _titleLabel.rectTransform.offsetMax = Vector2.zero;
 
-            _resumeButton = CreateButton(
-                panel.transform, "ResumeButton", "Resume",
-                new Vector2(0.12f, 0.52f), new Vector2(0.88f, 0.72f),
-                new Color(0.22f, 0.55f, 0.35f, 1f));
+            _closeButton = CreateButton(
+                panel.transform, "CloseButton", string.Empty,
+                new Vector2(0.80f, 0.84f), new Vector2(0.94f, 0.94f),
+                Color.white);
+            ConfigureManualCloseRect();
 
             _restartButton = CreateButton(
                 panel.transform, "RestartButton", "Restart",
@@ -206,6 +348,220 @@ namespace PixelFlowClone.UI.Popups
                 panel.transform, "HomeButton", "Home",
                 new Vector2(0.12f, 0.08f), new Vector2(0.88f, 0.26f),
                 new Color(0.45f, 0.35f, 0.28f, 1f));
+
+            EnsureSettingsControls();
+        }
+
+        private void EnsureSettingsControls()
+        {
+            if (_audioToggleButton != null && _hapticToggleButton != null)
+                return;
+
+            Transform panel = transform.Find("Panel");
+            if (panel == null)
+                return;
+
+            // Reflow only when upgrading the old three-button layout.
+            SetAnchors(_titleLabel, new Vector2(0.08f, 0.84f), new Vector2(0.92f, 0.96f));
+            SetAnchors(_restartButton, new Vector2(0.18f, 0.27f), new Vector2(0.82f, 0.46f));
+            SetAnchors(_homeButton, new Vector2(0.12f, 0.08f), new Vector2(0.88f, 0.23f));
+
+            if (_audioToggleButton == null)
+            {
+                _audioToggleButton = CreateButton(
+                    panel, "SoundToggle", "Sound: ON",
+                    new Vector2(0.08f, 0.69f), new Vector2(0.48f, 0.81f),
+                    new Color(0.25f, 0.72f, 0.42f, 1f));
+                _audioToggleLabel = _audioToggleButton.transform.Find("Label")?.GetComponent<TMP_Text>();
+            }
+
+            if (_hapticToggleButton == null)
+            {
+                _hapticToggleButton = CreateButton(
+                    panel, "HapticToggle", "Haptic: ON",
+                    new Vector2(0.52f, 0.69f), new Vector2(0.92f, 0.81f),
+                    new Color(0.25f, 0.72f, 0.42f, 1f));
+                _hapticToggleLabel = _hapticToggleButton.transform.Find("Label")?.GetComponent<TMP_Text>();
+            }
+        }
+
+        private void ApplyRestartButtonArtwork()
+        {
+            if (_restartButton == null)
+                return;
+
+            Sprite sprite = Resources.Load<Sprite>(RestartButtonResourcePath);
+            if (sprite == null)
+            {
+                Debug.LogWarning(
+                    $"[PausePopup] Restart artwork was not found at Resources/{RestartButtonResourcePath}.");
+                return;
+            }
+
+            Image image = _restartButton.GetComponent<Image>();
+            if (image == null)
+                return;
+
+            image.sprite = sprite;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = true;
+            image.color = Color.white;
+            _restartButton.targetGraphic = image;
+
+            TMP_Text label = _restartButton.transform.Find("Label")?.GetComponent<TMP_Text>();
+            if (label != null)
+                label.gameObject.SetActive(false);
+
+            ColorBlock colors = _restartButton.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1f, 1f, 1f, 0.92f);
+            colors.pressedColor = new Color(0.78f, 0.86f, 1f, 1f);
+            colors.selectedColor = Color.white;
+            _restartButton.colors = colors;
+        }
+
+        private void ApplyHomeButtonArtwork()
+        {
+            if (_homeButton == null)
+                return;
+
+            Sprite sprite = Resources.Load<Sprite>(HomeButtonResourcePath);
+            if (sprite == null)
+            {
+                Debug.LogWarning(
+                    $"[PausePopup] Home artwork was not found at Resources/{HomeButtonResourcePath}.");
+                return;
+            }
+
+            Image image = _homeButton.GetComponent<Image>();
+            if (image == null)
+                return;
+
+            image.sprite = sprite;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = true;
+            image.color = Color.white;
+            _homeButton.targetGraphic = image;
+
+            TMP_Text label = _homeButton.transform.Find("Label")?.GetComponent<TMP_Text>();
+            if (label != null)
+                label.gameObject.SetActive(false);
+
+            ColorBlock colors = _homeButton.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1f, 1f, 1f, 0.92f);
+            colors.pressedColor = new Color(1f, 0.76f, 0.76f, 1f);
+            colors.selectedColor = Color.white;
+            _homeButton.colors = colors;
+        }
+
+        private void ApplyCloseButtonArtwork()
+        {
+            if (_closeButton == null)
+                return;
+
+            Sprite sprite = Resources.Load<Sprite>(CloseButtonResourcePath);
+            if (sprite == null)
+            {
+                Debug.LogWarning(
+                    $"[PausePopup] Close artwork was not found at Resources/{CloseButtonResourcePath}.");
+                return;
+            }
+
+            _closeButton.name = "CloseButton";
+
+            Image image = _closeButton.GetComponent<Image>();
+            if (image == null)
+                return;
+
+            image.sprite = sprite;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = true;
+            image.color = Color.white;
+            _closeButton.targetGraphic = image;
+
+            TMP_Text label = _closeButton.transform.Find("Label")?.GetComponent<TMP_Text>();
+            if (label != null)
+                label.gameObject.SetActive(false);
+
+            ColorBlock colors = _closeButton.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1f, 1f, 1f, 0.92f);
+            colors.pressedColor = new Color(1f, 0.72f, 0.72f, 1f);
+            colors.selectedColor = Color.white;
+            _closeButton.colors = colors;
+        }
+
+        public void EnsureDirectHeaderEditing()
+        {
+            if (_titleLabel == null || _closeButton == null)
+                return;
+
+            Transform panel = transform.Find("Panel");
+            if (panel == null)
+                return;
+
+            Transform header = panel.Find("HeaderRoot");
+            LayoutElement titleLayout = _titleLabel.GetComponent<LayoutElement>();
+            LayoutElement closeLayout = _closeButton.GetComponent<LayoutElement>();
+
+            if (header != null)
+            {
+                _titleLabel.transform.SetParent(panel, false);
+                _closeButton.transform.SetParent(panel, false);
+
+                SetAnchors(_titleLabel, new Vector2(0.08f, 0.84f), new Vector2(0.92f, 0.96f));
+                _titleLabel.rectTransform.localScale = Vector3.one;
+                ConfigureManualCloseRect();
+
+                _titleLabel.transform.SetAsLastSibling();
+                _closeButton.transform.SetAsLastSibling();
+            }
+
+            DestroyLayoutObject(titleLayout);
+            DestroyLayoutObject(closeLayout);
+
+            if (header != null)
+                DestroyLayoutObject(header.gameObject);
+        }
+
+        private void ConfigureManualCloseRect()
+        {
+            RectTransform rect = _closeButton != null
+                ? _closeButton.transform as RectTransform
+                : null;
+            if (rect == null)
+                return;
+
+            rect.anchorMin = Vector2.one;
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(-120f, -105f);
+            rect.sizeDelta = new Vector2(84f, 84f);
+            rect.localScale = Vector3.one;
+        }
+
+        private static void DestroyLayoutObject(UnityEngine.Object target)
+        {
+            if (target == null)
+                return;
+
+            if (Application.isPlaying)
+                Destroy(target);
+            else
+                DestroyImmediate(target);
+        }
+
+        private static void SetAnchors(Component component, Vector2 anchorMin, Vector2 anchorMax)
+        {
+            RectTransform rect = component != null ? component.transform as RectTransform : null;
+            if (rect == null)
+                return;
+
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
         }
 
         private static Button CreateButton(

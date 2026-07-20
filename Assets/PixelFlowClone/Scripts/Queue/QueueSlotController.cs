@@ -15,11 +15,11 @@ namespace PixelFlowClone.Queue
     {
         [SerializeField] private Transform _slotsRoot;
         [SerializeField] private int _slotCount = 5;
-        [SerializeField] private float _slotSpacing = 1.1f;
+        [SerializeField] private float _slotSpacing = 1.6f;
         [SerializeField] private Vector2 _layoutDirection = Vector2.right;
         [SerializeField] private Transform[] _slotAnchors;
         [SerializeField] private Sprite _slotSprite;
-        [SerializeField] private float _slotVisualScale = 1f;
+        [SerializeField] private float _slotVisualScale = 1.15f;
         [SerializeField] private int _slotSortingOrder = -2;
 
         private CollectorUnit[] _occupants;

@@ -81,6 +81,7 @@ namespace PixelFlowClone.Editor
 
             var path = ScriptableObject.CreateInstance<ConveyorPathSO>();
             path.EntryWaypointIndex = 0;
+            path.LapCompleteWaypointIndex = 23;
             path.MoveSpeed = 0f;
 
             AssetDatabase.CreateAsset(path, PathAssetPath);

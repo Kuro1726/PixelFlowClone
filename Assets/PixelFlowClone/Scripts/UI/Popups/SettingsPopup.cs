@@ -59,6 +59,16 @@ namespace PixelFlowClone.UI.Popups
             gameObject.SetActive(false);
         }
 
+        /// <summary>
+        /// Creates the popup hierarchy ahead of Play Mode so its RectTransforms and
+        /// graphics can be adjusted directly in the Unity Editor.
+        /// </summary>
+        public void BuildEditableUi()
+        {
+            if (_audioToggleButton == null || _hapticToggleButton == null || _closeButton == null)
+                BuildRuntimeUi();
+        }
+
         private void WireButtons()
         {
             if (_audioToggleButton != null)

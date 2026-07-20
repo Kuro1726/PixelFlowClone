@@ -34,6 +34,7 @@ namespace PixelFlowClone.Managers
         private readonly Dictionary<CollectorUnit, bool> _hasLeftEntrySinceDispatch = new();
 
         private int _entryListIndex;
+        private int _lapCompleteListIndex;
         private float _effectiveRaycastDistance;
         private Transform _beltVisual;
 
@@ -170,7 +171,7 @@ namespace PixelFlowClone.Managers
         }
 
         /// <summary>
-        /// Moves (or creates) the 8 loop waypoints around the fixed playfield frame.
+        /// Moves (or creates) the rounded loop waypoints around the fixed playfield frame.
         /// </summary>
         public void RebuildPathAroundPlayfield(
             Vector2 playfieldCenter,
@@ -186,14 +187,16 @@ namespace PixelFlowClone.Managers
             IReadOnlyList<Vector2> positions = LevelLayout.ComputeConveyorLoopPositionsForPlayfield(
                 playfieldCenter,
                 playfieldSize,
-                pathMargin);
+                pathMargin,
+                ResolveCornerRadius(),
+                ResolveCornerSegments());
             ApplyWaypointPositions(positions);
             CacheWaypoints();
             RefreshBeltVisual();
         }
 
         /// <summary>
-        /// Moves (or creates) the 8 loop waypoints to frame the level grid (SO-space).
+        /// Moves (or creates) the rounded loop waypoints to frame the level grid (SO-space).
         /// </summary>
         public void RebuildPathAroundLevel(LevelDataSO level)
         {
@@ -208,7 +211,9 @@ namespace PixelFlowClone.Managers
 
             IReadOnlyList<Vector2> positions = LevelLayout.ComputeConveyorLoopPositions(
                 level,
-                Mathf.Max(_pathMargin, LevelLayout.DefaultPathMargin));
+                Mathf.Max(_pathMargin, LevelLayout.DefaultPathMargin),
+                ResolveCornerRadius(),
+                ResolveCornerSegments());
             ApplyWaypointPositions(positions);
             CacheWaypoints();
             RefreshBeltVisual();
@@ -296,6 +301,20 @@ namespace PixelFlowClone.Managers
             _beltVisual.SetParent(transform, false);
         }
 
+        private float ResolveCornerRadius()
+        {
+            return _config != null
+                ? Mathf.Max(0.01f, _config.ConveyorCornerRadius)
+                : LevelLayout.DefaultConveyorCornerRadius;
+        }
+
+        private int ResolveCornerSegments()
+        {
+            return _config != null
+                ? Mathf.Clamp(_config.ConveyorCornerSegments, 2, 12)
+                : LevelLayout.DefaultConveyorCornerSegments;
+        }
+
         private void ApplyWaypointPositions(IReadOnlyList<Vector2> positions)
         {
             ConveyorWaypoint[] existing = _pathRoot.GetComponentsInChildren<ConveyorWaypoint>(true)
@@ -350,6 +369,7 @@ namespace PixelFlowClone.Managers
                 _pathRoot.GetComponentsInChildren<ConveyorWaypoint>().OrderBy(w => w.Index));
 
             _entryListIndex = ResolveEntryListIndex();
+            _lapCompleteListIndex = ResolveLapCompleteListIndex();
         }
 
         public ConveyorWaypoint GetEntryWaypoint()
@@ -461,7 +481,10 @@ namespace PixelFlowClone.Managers
 
                 if (previousIndex != _entryListIndex)
                     _hasLeftEntrySinceDispatch[unit] = true;
-                else if (_hasLeftEntrySinceDispatch.TryGetValue(unit, out bool hasLeftEntry) && hasLeftEntry)
+
+                if (previousIndex == _lapCompleteListIndex &&
+                    _hasLeftEntrySinceDispatch.TryGetValue(unit, out bool hasLeftEntry) &&
+                    hasLeftEntry)
                     HandleLapComplete(unit);
             }
         }
@@ -553,6 +576,24 @@ namespace PixelFlowClone.Managers
             return _pathData != null
                 ? _pathData.ClampEntryIndex(_waypoints.Count)
                 : 0;
+        }
+
+        private int ResolveLapCompleteListIndex()
+        {
+            if (_waypoints.Count == 0)
+                return 0;
+
+            int desiredIndex = _pathData != null
+                ? _pathData.ResolveLapCompleteIndex(_waypoints.Count, _entryListIndex)
+                : (_entryListIndex - 1 + _waypoints.Count) % _waypoints.Count;
+
+            for (int i = 0; i < _waypoints.Count; i++)
+            {
+                if (_waypoints[i].Index == desiredIndex)
+                    return i;
+            }
+
+            return Mathf.Clamp(desiredIndex, 0, _waypoints.Count - 1);
         }
 
         private void NotifyConveyorCountChanged()

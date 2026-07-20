@@ -11,6 +11,12 @@ namespace PixelFlowClone.Utils
     {
         public const float DefaultPathMargin = 2.5f;
 
+        /// <summary>Radius of the rounded conveyor corners in world units.</summary>
+        public const float DefaultConveyorCornerRadius = 0.9f;
+
+        /// <summary>Number of straight samples used for each 90-degree conveyor corner.</summary>
+        public const int DefaultConveyorCornerSegments = 5;
+
         /// <summary>Queue row sits below the conveyor bottom edge (outside the loop).</summary>
         public const float DefaultQueueGapBelowPath = 1.25f;
 
@@ -136,13 +142,15 @@ namespace PixelFlowClone.Utils
         }
 
         /// <summary>
-        /// 8-point rectangle loop around a fixed playfield frame.
+        /// Rounded rectangle loop around a fixed playfield frame.
         /// Path sits <paramref name="pathMargin"/> outside the block frame.
         /// </summary>
         public static IReadOnlyList<Vector2> ComputeConveyorLoopPositionsForPlayfield(
             Vector2 playfieldCenter,
             Vector2 playfieldSize,
-            float pathMargin = DefaultPlayfieldPathMargin)
+            float pathMargin = DefaultPlayfieldPathMargin,
+            float cornerRadius = DefaultConveyorCornerRadius,
+            int cornerSegments = DefaultConveyorCornerSegments)
         {
             float halfW = Mathf.Max(0.01f, playfieldSize.x) * 0.5f;
             float halfH = Mathf.Max(0.01f, playfieldSize.y) * 0.5f;
@@ -152,29 +160,20 @@ namespace PixelFlowClone.Utils
             float minY = playfieldCenter.y - halfH - margin;
             float maxX = playfieldCenter.x + halfW + margin;
             float maxY = playfieldCenter.y + halfH + margin;
-            float midX = playfieldCenter.x;
-            float midY = playfieldCenter.y;
-
-            return new List<Vector2>
-            {
-                new(minX, minY),
-                new(midX, minY),
-                new(maxX, minY),
-                new(maxX, midY),
-                new(maxX, maxY),
-                new(midX, maxY),
-                new(minX, maxY),
-                new(minX, midY)
-            };
+            return BuildRoundedRectangleLoop(
+                minX, minY, maxX, maxY, cornerRadius, cornerSegments);
         }
 
         /// <summary>
-        /// 8-point rectangle loop clockwise around the level grid (entry at index 0, bottom-left).
+        /// Rounded rectangle loop counter-clockwise around the level grid.
+        /// Entry index 0 is the bottom-left corner's bottom tangent, moving right.
         /// Path sits <paramref name="pathMargin"/> outside the block sprite bounds.
         /// </summary>
         public static IReadOnlyList<Vector2> ComputeConveyorLoopPositions(
             LevelDataSO level,
-            float pathMargin = DefaultPathMargin)
+            float pathMargin = DefaultPathMargin,
+            float cornerRadius = DefaultConveyorCornerRadius,
+            int cornerSegments = DefaultConveyorCornerSegments)
         {
             GetGridBounds(level, out Vector2 gridMin, out Vector2 gridMax);
             float margin = Mathf.Max(0.5f, pathMargin);
@@ -182,20 +181,70 @@ namespace PixelFlowClone.Utils
             float minY = gridMin.y - margin;
             float maxX = gridMax.x + margin;
             float maxY = gridMax.y + margin;
+            return BuildRoundedRectangleLoop(
+                minX, minY, maxX, maxY, cornerRadius, cornerSegments);
+        }
+
+        private static IReadOnlyList<Vector2> BuildRoundedRectangleLoop(
+            float minX,
+            float minY,
+            float maxX,
+            float maxY,
+            float cornerRadius,
+            int cornerSegments)
+        {
+            float width = Mathf.Max(0.01f, maxX - minX);
+            float height = Mathf.Max(0.01f, maxY - minY);
+            float radius = Mathf.Clamp(cornerRadius, 0.01f, Mathf.Min(width, height) * 0.5f);
+            int segments = Mathf.Clamp(cornerSegments, 2, 12);
             float midX = (minX + maxX) * 0.5f;
             float midY = (minY + maxY) * 0.5f;
 
-            return new List<Vector2>
+            var result = new List<Vector2>(segments * 4 + 8);
+
+            // Start on the bottom edge so the configured entry continues moving right.
+            AddDistinct(result, new Vector2(minX + radius, minY));
+            AddDistinct(result, new Vector2(midX, minY));
+            AddDistinct(result, new Vector2(maxX - radius, minY));
+            AddArc(result, new Vector2(maxX - radius, minY + radius), radius, -90f, 0f, segments, true);
+
+            AddDistinct(result, new Vector2(maxX, midY));
+            AddDistinct(result, new Vector2(maxX, maxY - radius));
+            AddArc(result, new Vector2(maxX - radius, maxY - radius), radius, 0f, 90f, segments, true);
+
+            AddDistinct(result, new Vector2(midX, maxY));
+            AddDistinct(result, new Vector2(minX + radius, maxY));
+            AddArc(result, new Vector2(minX + radius, maxY - radius), radius, 90f, 180f, segments, true);
+
+            AddDistinct(result, new Vector2(minX, midY));
+            AddDistinct(result, new Vector2(minX, minY + radius));
+            // Skip the last point because it is identical to the loop's first point.
+            AddArc(result, new Vector2(minX + radius, minY + radius), radius, 180f, 270f, segments, false);
+
+            return result;
+        }
+
+        private static void AddArc(
+            List<Vector2> points,
+            Vector2 center,
+            float radius,
+            float startDegrees,
+            float endDegrees,
+            int segments,
+            bool includeEnd)
+        {
+            int last = includeEnd ? segments : segments - 1;
+            for (int i = 1; i <= last; i++)
             {
-                new(minX, minY),
-                new(midX, minY),
-                new(maxX, minY),
-                new(maxX, midY),
-                new(maxX, maxY),
-                new(midX, maxY),
-                new(minX, maxY),
-                new(minX, midY)
-            };
+                float angle = Mathf.Lerp(startDegrees, endDegrees, i / (float)segments) * Mathf.Deg2Rad;
+                AddDistinct(points, center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius);
+            }
+        }
+
+        private static void AddDistinct(List<Vector2> points, Vector2 point)
+        {
+            if (points.Count == 0 || (points[points.Count - 1] - point).sqrMagnitude > 0.000001f)
+                points.Add(point);
         }
 
         public static float ResolveConveyorPathMargin(GameConfigSO config)

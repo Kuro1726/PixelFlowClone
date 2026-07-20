@@ -27,16 +27,21 @@ namespace PixelFlowClone.Entities
         [SerializeField] private float _rejectShakeAmplitude = 0.18f;
         [Tooltip("World degrees the sprite nose points at local rotation 0. Right=0, Up=90, Left=180, Down=-90.")]
         [SerializeField] private float _spriteNoseAngleAtRest = 90f;
+        [Tooltip("Seconds used to blend the collector's rotation while turning on the conveyor.")]
+        [SerializeField] [Min(0f)] private float _turnSmoothTime = 0.08f;
 
         private readonly CollectorStateMachine _stateMachine = new();
         private Coroutine _exitRoutine;
         private Coroutine _rejectShakeRoutine;
         private Vector3 _defaultScale = Vector3.one;
+        private Vector3 _capacityLabelWorldOffset;
         private Vector3 _rejectShakeOrigin;
         private float _nextConsumeTime;
         private int _lastConsumeLane;
         private bool _hasConsumeLane;
         private Vector2 _consumeMoveDir = Vector2.right;
+        private bool _isOnRoundedCorner;
+        private float _turnAngularVelocity;
         /// <summary>After first successful consume this lap, face inward until lap ends.</summary>
         private bool _faceInwardForRestOfLap;
 
@@ -46,7 +51,7 @@ namespace PixelFlowClone.Entities
 
         public Rigidbody2D Body => _rigidbody;
 
-        /// <summary>Normalized direction of the current movement segment (for perpendicular raycast).</summary>
+        /// <summary>Cardinal gameplay direction used for lane selection and perpendicular raycasts.</summary>
         public Vector2 CurrentMoveDirection { get; private set; } = Vector2.right;
 
         public bool TrySetState(CollectorState target) => _stateMachine.TryTransition(target);
@@ -163,6 +168,15 @@ namespace PixelFlowClone.Entities
         {
             if (_rigidbody == null) _rigidbody = GetComponent<Rigidbody2D>();
             if (_spriteRenderer == null) _spriteRenderer = GetComponent<SpriteRenderer>();
+            GameplayFontUtility.Apply(_capacityLabel);
+            if (_capacityLabel != null)
+            {
+                Vector2 authoredPosition = _capacityLabel.rectTransform.anchoredPosition;
+                _capacityLabelWorldOffset = new Vector3(
+                    authoredPosition.x,
+                    authoredPosition.y,
+                    _capacityLabel.transform.localPosition.z);
+            }
             _defaultScale = transform.localScale;
         }
 
@@ -181,6 +195,9 @@ namespace PixelFlowClone.Entities
         /// </summary>
         private void DrawPerpendicularRayPreview()
         {
+            if (_isOnRoundedCorner)
+                return;
+
             if (!ConveyorPathManager.HasInstance)
                 return;
 
@@ -231,9 +248,12 @@ namespace PixelFlowClone.Entities
 
         public void SetMoveDirection(Vector2 direction)
         {
-            CurrentMoveDirection = direction.sqrMagnitude > 0.0001f
+            Vector2 tangent = direction.sqrMagnitude > 0.0001f
                 ? direction.normalized
                 : Vector2.right;
+            CurrentMoveDirection = SnapToCardinal(tangent);
+            _consumeMoveDir = CurrentMoveDirection;
+            _isOnRoundedCorner = IsDiagonal(tangent);
         }
 
         /// <summary>
@@ -242,7 +262,8 @@ namespace PixelFlowClone.Entities
         public void PrepareConveyorFacing()
         {
             _faceInwardForRestOfLap = false;
-            ApplyFacingFromMoveDirection(Vector2.right);
+            _isOnRoundedCorner = false;
+            ApplyFacingFromMoveDirection(Vector2.right, true);
         }
 
         public void SuppressConsumeFor(float seconds)
@@ -263,6 +284,7 @@ namespace PixelFlowClone.Entities
         {
             CurrentMoveDirection = Vector2.right;
             _consumeMoveDir = Vector2.right;
+            _isOnRoundedCorner = false;
             transform.localScale = _defaultScale;
             ResetFacing();
             _exitRoutine = null;
@@ -329,21 +351,40 @@ namespace PixelFlowClone.Entities
             if (dir.sqrMagnitude < 0.0001f)
                 return;
 
-            dir.Normalize();
+            Vector2 tangent = dir.normalized;
+            Vector2 cardinalDirection = SnapToCardinal(tangent);
+            _isOnRoundedCorner = IsDiagonal(tangent);
+
             // New belt edge: next lane on that edge may fire again.
-            if (Vector2.Dot(dir, _consumeMoveDir) < 0.3f)
+            if (Vector2.Dot(cardinalDirection, _consumeMoveDir) < 0.3f)
                 _hasConsumeLane = false;
 
-            _consumeMoveDir = dir;
-            CurrentMoveDirection = dir;
-            RefreshVisualFacing();
+            _consumeMoveDir = cardinalDirection;
+            CurrentMoveDirection = cardinalDirection;
+            RefreshVisualFacing(tangent);
+        }
+
+        private static Vector2 SnapToCardinal(Vector2 direction)
+        {
+            if (direction.sqrMagnitude < 0.0001f)
+                return Vector2.right;
+
+            return Mathf.Abs(direction.x) >= Mathf.Abs(direction.y)
+                ? new Vector2(direction.x >= 0f ? 1f : -1f, 0f)
+                : new Vector2(0f, direction.y >= 0f ? 1f : -1f);
+        }
+
+        private static bool IsDiagonal(Vector2 direction)
+        {
+            const float axisEpsilon = 0.001f;
+            return Mathf.Abs(direction.x) > axisEpsilon && Mathf.Abs(direction.y) > axisEpsilon;
         }
 
         /// <summary>
         /// Before first shot this lap: face along the belt.
         /// After first successful consume: keep facing inward toward the grid until lap ends.
         /// </summary>
-        private void RefreshVisualFacing()
+        private void RefreshVisualFacing(Vector2 pathTangent)
         {
             if (_faceInwardForRestOfLap)
             {
@@ -355,7 +396,7 @@ namespace PixelFlowClone.Entities
                 }
             }
 
-            ApplyFacingFromMoveDirection(CurrentMoveDirection);
+            ApplyFacingFromMoveDirection(pathTangent);
         }
 
         private Vector2 GetCurrentShootDirection()
@@ -382,28 +423,47 @@ namespace PixelFlowClone.Entities
         /// <summary>
         /// Points the sprite nose along <paramref name="dir"/> (belt move or shoot inward).
         /// </summary>
-        private void ApplyFacingFromMoveDirection(Vector2 dir)
+        private void ApplyFacingFromMoveDirection(Vector2 dir, bool snap = false)
         {
             if (dir.sqrMagnitude < 0.0001f)
                 return;
 
             // Atan2: angle of desired nose from +X. Subtract art's rest nose angle.
             float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - _spriteNoseAngleAtRest;
-            SetFacingAngle(angle);
+            SetFacingAngle(angle, snap);
         }
 
         private void ResetFacing()
         {
             _faceInwardForRestOfLap = false;
             // Waiting / queue / pool: authored art pose (nose up at rest).
-            SetFacingAngle(0f);
+            SetFacingAngle(0f, true);
         }
 
-        private void SetFacingAngle(float zDegrees)
+        private void SetFacingAngle(float zDegrees, bool snap = false)
         {
-            transform.rotation = Quaternion.Euler(0f, 0f, zDegrees);
+            float appliedAngle = zDegrees;
+            if (!snap && _turnSmoothTime > 0.0001f)
+            {
+                float currentAngle = _rigidbody != null
+                    ? _rigidbody.rotation
+                    : transform.eulerAngles.z;
+                appliedAngle = Mathf.SmoothDampAngle(
+                    currentAngle,
+                    zDegrees,
+                    ref _turnAngularVelocity,
+                    _turnSmoothTime,
+                    Mathf.Infinity,
+                    Time.fixedDeltaTime);
+            }
+            else
+            {
+                _turnAngularVelocity = 0f;
+            }
+
+            transform.rotation = Quaternion.Euler(0f, 0f, appliedAngle);
             if (_rigidbody != null)
-                _rigidbody.rotation = zDegrees;
+                _rigidbody.rotation = appliedAngle;
 
             SnapCapacityLabelAbove();
         }
@@ -413,8 +473,7 @@ namespace PixelFlowClone.Entities
             if (_capacityLabel == null)
                 return;
 
-            const float labelHeight = 0.6f;
-            _capacityLabel.transform.position = transform.position + Vector3.up * labelHeight;
+            _capacityLabel.transform.position = transform.position + _capacityLabelWorldOffset;
             _capacityLabel.transform.rotation = Quaternion.identity;
         }
 
@@ -449,6 +508,11 @@ namespace PixelFlowClone.Entities
         private void TryConsumeForLanesCrossed(Vector2 from, Vector2 to)
         {
             if (State != CollectorState.OnConveyor || Capacity <= 0)
+                return;
+
+            // Rounded corners are movement-only. Consume resumes on the next axis-aligned edge,
+            // preventing diagonal rays / cross-lane hits while the visual follows the curve.
+            if (_isOnRoundedCorner)
                 return;
 
             if (Time.time < _nextConsumeTime)
@@ -564,7 +628,7 @@ namespace PixelFlowClone.Entities
         }
 
         /// <summary>
-        /// Called when the unit completes one full conveyor loop and returns to the entry waypoint.
+        /// Called when the unit reaches the path's configured lap-complete waypoint.
         /// Capacity == 0 → exit. Otherwise → queue, unless endgame rush keeps it circulating.
         /// </summary>
         public void OnLapComplete()
@@ -763,6 +827,7 @@ namespace PixelFlowClone.Entities
             _nextConsumeTime = 0f;
             _hasConsumeLane = false;
             _consumeMoveDir = Vector2.right;
+            _isOnRoundedCorner = false;
             _stateMachine.ResetTo(CollectorState.Pooled);
             if (_capacityLabel != null) _capacityLabel.text = string.Empty;
 
