@@ -2,6 +2,7 @@ using System.Collections;
 using PixelFlowClone.Data;
 using PixelFlowClone.Managers;
 using PixelFlowClone.UI.Screens;
+using PixelFlowClone.Utils;
 using UnityEngine;
 
 namespace PixelFlowClone.Core
@@ -28,6 +29,7 @@ namespace PixelFlowClone.Core
         {
             // Only create missing shells here. PoolManager must live in the scene with prefabs.
             // Readiness is evaluated in Start so scene singleton Awakes have already run.
+            PortraitDisplay.ApplyForStandalone();
             GameSettings.Apply();
 
             PersistentManagers.EnsureGameManager();

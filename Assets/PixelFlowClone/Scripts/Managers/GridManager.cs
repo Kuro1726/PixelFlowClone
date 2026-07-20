@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using PixelFlowClone.Core;
 using PixelFlowClone.Data;
@@ -27,6 +28,7 @@ namespace PixelFlowClone.Managers
         [SerializeField] [Range(1f, 1.25f)] private float _blockPackScale = 1.14f;
 
         private readonly Dictionary<Vector2Int, PixelBlock> _blocks = new();
+        private readonly HashSet<PixelBlock> _pendingConsumedBlocks = new();
         private LevelDataSO _currentLevel;
         private Vector2 _runtimeOrigin;
         private float _runtimeCellSize = 1f;
@@ -111,6 +113,8 @@ namespace PixelFlowClone.Managers
         /// </summary>
         public void ClearGrid()
         {
+            StopAllCoroutines();
+
             if (PoolManager.Instance != null)
             {
                 foreach (PixelBlock block in _blocks.Values)
@@ -118,9 +122,16 @@ namespace PixelFlowClone.Managers
                     if (block != null)
                         PoolManager.Instance.ReleasePixelBlock(block);
                 }
+
+                foreach (PixelBlock block in _pendingConsumedBlocks)
+                {
+                    if (block != null)
+                        PoolManager.Instance.ReleasePixelBlock(block);
+                }
             }
 
             _blocks.Clear();
+            _pendingConsumedBlocks.Clear();
         }
 
         /// <summary>
@@ -128,6 +139,15 @@ namespace PixelFlowClone.Managers
         /// Returns false if no block exists, colors differ, or the block was already consumed.
         /// </summary>
         public bool TryConsumeBlock(ColorId color, Vector2Int gridPosition)
+        {
+            return TryConsumeBlock(color, gridPosition, 0f);
+        }
+
+        /// <summary>
+        /// Logically consumes immediately, but can keep the block visual alive until a
+        /// cosmetic collector shot reaches it. Collision is disabled during the delay.
+        /// </summary>
+        public bool TryConsumeBlock(ColorId color, Vector2Int gridPosition, float visualDelay)
         {
             if (!_blocks.TryGetValue(gridPosition, out PixelBlock block) || block == null)
                 return false;
@@ -140,11 +160,57 @@ namespace PixelFlowClone.Managers
             ColorId consumedColor = block.Color;
             _blocks.Remove(gridPosition);
 
-            if (PoolManager.Instance != null)
+            visualDelay = Mathf.Max(0f, visualDelay);
+            if (visualDelay <= 0f)
+                FinalizeConsumedBlock(block, worldPosition, consumedColor);
+            else
+            {
+                _pendingConsumedBlocks.Add(block);
+                StartCoroutine(FinalizeConsumedBlockAfterDelay(
+                    block,
+                    worldPosition,
+                    consumedColor,
+                    visualDelay));
+            }
+
+            return true;
+        }
+
+        private IEnumerator FinalizeConsumedBlockAfterDelay(
+            PixelBlock block,
+            Vector3 worldPosition,
+            ColorId consumedColor,
+            float delay)
+        {
+            yield return new WaitForSeconds(delay);
+
+            if (block != null)
+            {
+                GameConfigSO config = ConveyorPathManager.HasInstance
+                    ? ConveyorPathManager.Instance.Config
+                    : null;
+                float punchScale = config != null ? config.BlockHitPunchScale : 1.15f;
+                float punchDuration = config != null ? config.BlockHitPunchDuration : 0.07f;
+                float shrinkDuration = config != null ? config.BlockHitShrinkDuration : 0.16f;
+                yield return block.PlayHitDisappearAnimation(
+                    punchScale,
+                    punchDuration,
+                    shrinkDuration);
+            }
+
+            _pendingConsumedBlocks.Remove(block);
+            FinalizeConsumedBlock(block, worldPosition, consumedColor);
+        }
+
+        private static void FinalizeConsumedBlock(
+            PixelBlock block,
+            Vector3 worldPosition,
+            ColorId consumedColor)
+        {
+            if (block != null && PoolManager.Instance != null)
                 PoolManager.Instance.ReleasePixelBlock(block);
 
             GameEvents.RaiseBlockConsumed(worldPosition, consumedColor);
-            return true;
         }
 
         public Vector3 GridToWorld(Vector2Int gridPos)

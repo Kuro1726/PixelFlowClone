@@ -1,6 +1,7 @@
 using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.Managers;
+using PixelFlowClone.VFX;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -19,22 +20,80 @@ namespace PixelFlowClone.Editor
         private const string PrefabPath = PrefabFolder + "/PF_GameplayContext.prefab";
         private const string DefaultLevelPath =
             "Assets/PixelFlowClone/ScriptableObjects/Levels/Level_001.asset";
+        private const string VictoryPanelPath =
+            "Assets/PixelFlowClone/Art/UI/Popups/Victory/VictoryPanel.png";
+        private const string VictoryTitleBannerPath =
+            "Assets/PixelFlowClone/Art/UI/Popups/Victory/TitleBanner.png";
+        private const string VictoryTrophyPath =
+            "Assets/PixelFlowClone/Art/UI/Popups/Victory/Trophy.png";
+        private const string VictoryTrophyWingPath =
+            "Assets/PixelFlowClone/Art/UI/Popups/Victory/TrophyWing.png";
+        private const string VictoryContinueButtonPath =
+            "Assets/PixelFlowClone/Art/UI/Popups/Victory/ContinueButton.png";
 
         [InitializeOnLoadMethod]
         private static void BuildMissingPrefabWhenGameplaySceneIsOpen()
         {
-            EditorApplication.delayCall += () =>
+            EditorApplication.playModeStateChanged -= HandlePlayModeStateChanged;
+            EditorApplication.playModeStateChanged += HandlePlayModeStateChanged;
+            EditorApplication.delayCall += EnsureGameplayContextPrefab;
+        }
+
+        private static void HandlePlayModeStateChanged(PlayModeStateChange state)
+        {
+            if (state == PlayModeStateChange.EnteredEditMode)
+                EditorApplication.delayCall += EnsureGameplayContextPrefab;
+        }
+
+        private static void EnsureGameplayContextPrefab()
+        {
+            if (EditorApplication.isCompiling)
             {
-                if (EditorApplication.isPlayingOrWillChangePlaymode)
+                EditorApplication.delayCall += EnsureGameplayContextPrefab;
+                return;
+            }
+
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                return;
+
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+            if (prefab != null && prefab.GetComponent<GameplayContext>() != null)
+            {
+                if (prefab.GetComponentInChildren<CollectorShotVfx>(true) == null)
+                    AddShotVfxToExistingPrefab();
+                return;
+            }
+
+            if (SceneManager.GetActiveScene().path == ScenePath)
+                BuildGameplayContextPrefab();
+        }
+
+        private static void AddShotVfxToExistingPrefab()
+        {
+            GameObject contents = PrefabUtility.LoadPrefabContents(PrefabPath);
+            try
+            {
+                GameplayContext context = contents.GetComponent<GameplayContext>();
+                if (context == null || contents.GetComponentInChildren<CollectorShotVfx>(true) != null)
                     return;
 
-                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
-                if (prefab != null && prefab.GetComponent<GameplayContext>() != null)
-                    return;
+                var shotObject = new GameObject("CollectorShotVfx");
+                shotObject.transform.SetParent(contents.transform, false);
+                CollectorShotVfx shotVfx = shotObject.AddComponent<CollectorShotVfx>();
 
-                if (SceneManager.GetActiveScene().path == ScenePath)
-                    BuildGameplayContextPrefab();
-            };
+                SerializedObject contextSo = new SerializedObject(context);
+                contextSo.FindProperty("_shotVfx").objectReferenceValue = shotVfx;
+                contextSo.ApplyModifiedPropertiesWithoutUndo();
+
+                EditorUtility.SetDirty(context);
+                PrefabUtility.SaveAsPrefabAsset(contents, PrefabPath);
+                AssetDatabase.SaveAssets();
+                Debug.Log("[PixelFlowClone] CollectorShotVfx added to Gameplay Context prefab.");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
+            }
         }
 
         [MenuItem("PixelFlowClone/Build Gameplay Context Prefab")]
@@ -79,6 +138,31 @@ namespace PixelFlowClone.Editor
                 context = root.AddComponent<GameplayContext>();
 
             context.Configure(grid, conveyor, queue, input);
+
+            Sprite victoryPanel = AssetDatabase.LoadAssetAtPath<Sprite>(VictoryPanelPath);
+            Sprite victoryTitleBanner = AssetDatabase.LoadAssetAtPath<Sprite>(VictoryTitleBannerPath);
+            Sprite victoryTrophy = AssetDatabase.LoadAssetAtPath<Sprite>(VictoryTrophyPath);
+            Sprite victoryTrophyWing = AssetDatabase.LoadAssetAtPath<Sprite>(VictoryTrophyWingPath);
+            Sprite victoryContinueButton = AssetDatabase.LoadAssetAtPath<Sprite>(VictoryContinueButtonPath);
+            SerializedObject contextSo = new SerializedObject(context);
+            contextSo.FindProperty("_victoryPanelSprite").objectReferenceValue = victoryPanel;
+            contextSo.FindProperty("_victoryTitleBannerSprite").objectReferenceValue = victoryTitleBanner;
+            contextSo.FindProperty("_victoryTrophySprite").objectReferenceValue = victoryTrophy;
+            contextSo.FindProperty("_victoryTrophyWingSprite").objectReferenceValue = victoryTrophyWing;
+            contextSo.FindProperty("_victoryContinueButtonSprite").objectReferenceValue = victoryContinueButton;
+            contextSo.ApplyModifiedPropertiesWithoutUndo();
+
+            if (victoryPanel == null)
+                Debug.LogWarning($"[PixelFlowClone] Victory panel not found: {VictoryPanelPath}");
+            if (victoryTitleBanner == null)
+                Debug.LogWarning($"[PixelFlowClone] Victory title banner not found: {VictoryTitleBannerPath}");
+            if (victoryTrophy == null)
+                Debug.LogWarning($"[PixelFlowClone] Victory trophy not found: {VictoryTrophyPath}");
+            if (victoryTrophyWing == null)
+                Debug.LogWarning($"[PixelFlowClone] Victory trophy wing not found: {VictoryTrophyWingPath}");
+            if (victoryContinueButton == null)
+                Debug.LogWarning($"[PixelFlowClone] Victory continue button not found: {VictoryContinueButtonPath}");
+
             root.name = "PF_GameplayContext";
 
             EnsurePrefabFolder();

@@ -102,6 +102,7 @@ namespace PixelFlowClone.Managers
         public void RegisterHud(GameplayHUD hud)
         {
             _hud = hud;
+            SyncHudVisibilityFromGameState();
         }
 
         public void UnregisterHud(GameplayHUD hud)
@@ -192,6 +193,9 @@ namespace PixelFlowClone.Managers
                 InvokeHide(popup);
 
             RemovePopupFromStack(id);
+
+            if (id == PopupId.Victory)
+                SyncHudVisibilityFromGameState();
         }
 
         public void HideTopPopup()
@@ -210,9 +214,15 @@ namespace PixelFlowClone.Managers
                 if (_popups.TryGetValue(id, out MonoBehaviour popup) && popup != null)
                     InvokeHide(popup);
             }
+
+            SyncHudVisibilityFromGameState();
         }
 
-        public void ShowVictory() => ShowPopup(PopupId.Victory);
+        public void ShowVictory()
+        {
+            HideHud();
+            ShowPopup(PopupId.Victory);
+        }
 
         public void ShowDefeat() => ShowPopup(PopupId.Defeat);
 
@@ -239,6 +249,7 @@ namespace PixelFlowClone.Managers
                     ShowPause();
                     break;
                 case GameState.Playing:
+                    ShowHud();
                     HidePopup(PopupId.Pause);
                     HidePopup(PopupId.Victory);
                     HidePopup(PopupId.Defeat);
@@ -252,9 +263,34 @@ namespace PixelFlowClone.Managers
                     ShowDefeat();
                     break;
                 case GameState.Loading:
+                    HideHud();
                     HideAllPopups();
                     break;
             }
+        }
+
+        private void ShowHud()
+        {
+            if (_hud != null)
+                _hud.ShowGameplayElements();
+        }
+
+        private void HideHud()
+        {
+            if (_hud != null)
+                _hud.HideGameplayElements();
+        }
+
+        private void SyncHudVisibilityFromGameState()
+        {
+            if (_hud == null || !GameManager.HasInstance)
+                return;
+
+            GameState state = GameManager.Instance.CurrentState;
+            if (state == GameState.Victory || state == GameState.Loading)
+                HideHud();
+            else
+                ShowHud();
         }
 
         private void ApplyScreenVisibility()

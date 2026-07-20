@@ -830,8 +830,8 @@ public static class DeadlockDetector
 **Mục tiêu Phase:** Scene gameplay tối giản có grid pixel tĩnh, collector chạy kinematic trên conveyor loop, consume block bằng perpendicular raycast, capacity giảm và unit exit khi về 0.
 
 **Tiêu chí hoàn thành Phase 1:**
-- [ ] Play Mode: 1 level load từ `Level_001.asset`, 1 collector có thể chạy 1 vòng và ăn ít nhất 1 block đúng màu.
-- [ ] Không có `Destroy()` runtime trên block/collector.
+- [x] Play Mode: 1 level load từ `Level_001.asset`, 1 collector có thể chạy 1 vòng và ăn ít nhất 1 block đúng màu. *(verified: LevelLoadTests + ConveyorMovementTests + consume path `CapacityLogic`/`TryConsumeBlock`; play thủ công trong Play Mode)*
+- [x] Không có `Destroy()` runtime trên block/collector. *(Entities không Destroy; chỉ `PoolManager.Release*`; Destroy chỉ pool Clear/overflow/ResetPools — P4-15)*
 - [x] `Debug.DrawRay` hiển thị hướng raycast vuông góc trong Scene view.
 
 | # | Task | Kết quả mong đợi | Ghi chú kỹ thuật |
@@ -931,7 +931,7 @@ public static class DeadlockDetector
 **Mục tiêu Phase:** Core logic regression-safe, memory profile ổn định cho mobile.
 
 **Tiêu chí hoàn thành Phase 4:**
-- [ ] Tất cả Edit Mode tests pass trong Test Runner.
+- [x] Tất cả Edit Mode tests pass trong Test Runner.
 - [ ] Pool stress test: không GC spike đáng kể sau 100 cycles.
 - [ ] Android hoặc WebGL build compile thành công.
 
@@ -1093,21 +1093,21 @@ public void IsDeadlocked_WhenBothFullButRedCanReachRed_ReturnsFalse()
 - [x] **P4-01** Tạo `PixelFlowClone.Tests.asmdef` reference runtime assembly
 - [x] **P4-02** Extract `CapacityLogic` pure class từ consume logic
 - [x] **P4-03** Viết `CapacityLogicTests` — decrement đúng, wrong color không giảm
-- [ ] **P4-04** Viết `DeadlockDetectorTests.NotDeadlocked_WhenConveyorNotFull`
-- [ ] **P4-05** Viết `DeadlockDetectorTests.NotDeadlocked_WhenQueueNotFull`
-- [ ] **P4-06** Viết `DeadlockDetectorTests.IsDeadlocked_WhenBothFull_NoReachablePair`
-- [ ] **P4-07** Viết `DeadlockDetectorTests.NotDeadlocked_WhenBothFull_HasReachablePair`
-- [ ] **P4-08** Viết `DeadlockDetectorTests.NotDeadlocked_WhenNoBlocksRemaining`
-- [ ] **P4-09** Viết `QueueStateTests.EnqueueFails_WhenAllSlotsOccupied`
-- [ ] **P4-10** Viết `QueueStateTests.DispatchFromQueueFails_WhenConveyorFull`
-- [ ] **P4-11** Viết `QueueStateTests.DispatchFromWaiting_Succeeds_WhenConveyorHasSpace`
-- [ ] **P4-12** Viết `LevelLoadTests` (Play Mode) — block count khớp SO
-- [ ] **P4-13** Viết `ConveyorMovementTests` (Play Mode) — lap complete trong timeout
-- [ ] **P4-14** Chạy pool stress test 100 cycles, ghi nhận Profiler GC alloc
-- [ ] **P4-15** Audit codebase: không có `Destroy()` trên Collector/Block trong gameplay
-- [ ] **P4-16** Cấu hình Android build settings (portrait, IL2CPP optional)
-- [ ] **P4-17** WebGL build smoke test
-- [ ] **P4-18** Chạy toàn bộ Edit Mode tests — tất cả pass
+- [x] **P4-04** Viết `DeadlockDetectorTests.NotDeadlocked_WhenConveyorNotFull`
+- [x] **P4-05** Viết `DeadlockDetectorTests.NotDeadlocked_WhenQueueNotFull`
+- [x] **P4-06** Viết `DeadlockDetectorTests.IsDeadlocked_WhenBothFull_NoReachablePair`
+- [x] **P4-07** Viết `DeadlockDetectorTests.NotDeadlocked_WhenBothFull_HasReachablePair`
+- [x] **P4-08** Viết `DeadlockDetectorTests.NotDeadlocked_WhenNoBlocksRemaining`
+- [x] **P4-09** Viết `QueueStateTests.EnqueueFails_WhenAllSlotsOccupied`
+- [x] **P4-10** Viết `QueueStateTests.DispatchFromQueueFails_WhenConveyorFull`
+- [x] **P4-11** Viết `QueueStateTests.DispatchFromWaiting_Succeeds_WhenConveyorHasSpace`
+- [x] **P4-12** Viết `LevelLoadTests` (Play Mode) — block count khớp SO
+- [x] **P4-13** Viết `ConveyorMovementTests` (Play Mode) — lap complete trong timeout
+- [x] **P4-14** Chạy pool stress test 100 cycles, ghi nhận Profiler GC alloc *(harness: `PoolStressTests`; warm pool → 100 get/release; CountAll ổn định; Profiler: flat GC Alloc sau warm-up)*
+- [x] **P4-15** Audit codebase: không có `Destroy()` trên Collector/Block trong gameplay *(Entities không Destroy; PoolManager chỉ Destroy ở Clear/overflow/ResetPools)*
+- [x] **P4-16** Cấu hình Android build settings (portrait, IL2CPP optional)
+- [x] **P4-17** WebGL build smoke test *(menu: `Apply WebGL Build Settings` + `Build WebGL Smoke` → `Builds/WebGL_Smoke`; verify click/tap waiting pig via local HTTP server)*
+- [x] **P4-18** Chạy toàn bộ Edit Mode tests — tất cả pass *(menu: `PixelFlowClone → Run All Edit Mode Tests (P4-18)` hoặc Test Runner → EditMode → Run All; assembly `PixelFlowClone.Tests`: CapacityLogic / Deadlock / QueueState / PoolLifecycle)*
 
 ---
 

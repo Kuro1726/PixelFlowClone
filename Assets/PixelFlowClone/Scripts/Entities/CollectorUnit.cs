@@ -523,8 +523,15 @@ namespace PixelFlowClone.Entities
                 return;
 
             ColorId blockColor = hitBlock.Color;
-            if (!GridManager.Instance.TryConsumeBlock(Color, hitBlock.GridPosition))
+            Vector3 shotOrigin = _rigidbody != null
+                ? (Vector3)_rigidbody.position
+                : transform.position;
+            Vector3 shotTarget = hitBlock.transform.position;
+            float visualDelay = Mathf.Max(0.03f, config.CollectorShotTravelDuration);
+            if (!GridManager.Instance.TryConsumeBlock(Color, hitBlock.GridPosition, visualDelay))
                 return;
+
+            GameEvents.RaiseCollectorShot(shotOrigin, shotTarget);
 
             // First successful shot this lap: face inward for the rest of the lap.
             _faceInwardForRestOfLap = true;

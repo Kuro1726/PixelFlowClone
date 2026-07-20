@@ -20,10 +20,13 @@ namespace PixelFlowClone.UI.Screens
     {
         [SerializeField] private CanvasGroup _canvasGroup;
         [SerializeField] private RectTransform _topBarRoot;
+        [SerializeField] private Sprite _pauseIcon;
+        [SerializeField] private Sprite _levelBadgeSprite;
         [SerializeField] private Button _pauseButton;
         [SerializeField] private TMP_Text _pauseButtonLabel;
         [SerializeField] private TMP_Text _levelLabel;
         [SerializeField] private TMP_Text _conveyorLabel;
+        private bool _gameplayElementsVisible = true;
 
         public Button PauseButton => _pauseButton;
         public TMP_Text LevelLabel => _levelLabel;
@@ -34,7 +37,10 @@ namespace PixelFlowClone.UI.Screens
         private void Awake()
         {
             EnsureEventSystem();
-            RebuildUi();
+            if (!HasSerializedUi())
+                RebuildUi();
+            else
+                WirePauseButton();
             RefreshLevelLabel();
             RefreshConveyorIndicator();
         }
@@ -42,9 +48,6 @@ namespace PixelFlowClone.UI.Screens
         private void Start()
         {
             // Conveyor/GameConfig may not exist yet during Awake — refresh HUD sizes once ready.
-            if (ResolveConfig() != null)
-                RebuildUi();
-
             SubscribeManagers();
             RefreshLevelLabel();
             RefreshPauseLabel();
@@ -56,6 +59,7 @@ namespace PixelFlowClone.UI.Screens
             GameEvents.OnConveyorCountChanged -= HandleConveyorCountChanged;
             GameEvents.OnConveyorCountChanged += HandleConveyorCountChanged;
             SubscribeManagers();
+            WirePauseButton();
             RefreshLevelLabel();
             RefreshPauseLabel();
             RefreshConveyorIndicator();
@@ -98,7 +102,7 @@ namespace PixelFlowClone.UI.Screens
 
             if (_topBarRoot != null)
             {
-                Destroy(_topBarRoot.gameObject);
+                DestroyUiObject(_topBarRoot.gameObject);
                 _topBarRoot = null;
                 _pauseButton = null;
                 _pauseButtonLabel = null;
@@ -120,9 +124,25 @@ namespace PixelFlowClone.UI.Screens
             RefreshConveyorIndicator();
         }
 
+        private bool HasSerializedUi()
+        {
+            return _topBarRoot != null &&
+                   _pauseButton != null &&
+                   _levelLabel != null &&
+                   _conveyorLabel != null;
+        }
+
+#if UNITY_EDITOR
+        public void BuildForEditor()
+        {
+            RebuildUi();
+        }
+#endif
+
         public void Show()
         {
             gameObject.SetActive(true);
+            ShowGameplayElements();
             if (_canvasGroup != null)
             {
                 _canvasGroup.alpha = 1f;
@@ -133,6 +153,7 @@ namespace PixelFlowClone.UI.Screens
 
         public void Hide()
         {
+            _gameplayElementsVisible = false;
             if (_canvasGroup != null)
             {
                 _canvasGroup.alpha = 0f;
@@ -141,6 +162,20 @@ namespace PixelFlowClone.UI.Screens
             }
 
             gameObject.SetActive(false);
+        }
+
+        public void ShowGameplayElements()
+        {
+            _gameplayElementsVisible = true;
+            if (_topBarRoot != null)
+                _topBarRoot.gameObject.SetActive(true);
+        }
+
+        public void HideGameplayElements()
+        {
+            _gameplayElementsVisible = false;
+            if (_topBarRoot != null)
+                _topBarRoot.gameObject.SetActive(false);
         }
 
         public void SetLevelIndex(int zeroBasedIndex)
@@ -319,34 +354,39 @@ namespace PixelFlowClone.UI.Screens
             _topBarRoot.offsetMin = Vector2.zero;
             _topBarRoot.offsetMax = Vector2.zero;
 
-            Image topBg = topGo.AddComponent<Image>();
-            topBg.color = new Color(0.08f, 0.1f, 0.14f, 0.82f);
-            topBg.raycastTarget = false;
-
             _pauseButton = CreateHudButton(
-                _topBarRoot, "PauseButton", "Pause",
+                _topBarRoot, "PauseButton", "Pause", _pauseIcon,
                 new Vector2(0.02f, 0.14f), new Vector2(0.22f, 0.86f), fontSize: fontSize * 0.9f,
                 out _pauseButtonLabel);
 
-            Image conveyorBadge = CreateImage(
-                _topBarRoot, "ConveyorBadge", new Color(0.16f, 0.2f, 0.28f, 1f));
-            conveyorBadge.rectTransform.anchorMin = new Vector2(0.28f, 0.14f);
-            conveyorBadge.rectTransform.anchorMax = new Vector2(0.58f, 0.86f);
-            conveyorBadge.rectTransform.offsetMin = Vector2.zero;
-            conveyorBadge.rectTransform.offsetMax = Vector2.zero;
-            conveyorBadge.raycastTarget = false;
+            var conveyorBadgeGo = new GameObject("ConveyorBadge", typeof(RectTransform));
+            conveyorBadgeGo.transform.SetParent(_topBarRoot, false);
+            RectTransform conveyorBadge = conveyorBadgeGo.GetComponent<RectTransform>();
+            conveyorBadge.anchorMin = new Vector2(0.28f, 0.14f);
+            conveyorBadge.anchorMax = new Vector2(0.58f, 0.86f);
+            conveyorBadge.offsetMin = Vector2.zero;
+            conveyorBadge.offsetMax = Vector2.zero;
 
             _conveyorLabel = CreateLabel(
-                conveyorBadge.transform, "ConveyorLabel", "5/5", fontSize, FontStyles.Bold);
+                conveyorBadge, "ConveyorLabel", "5/5", fontSize * 1.35f, FontStyles.Bold);
             StretchFull(_conveyorLabel.rectTransform);
 
+            Image levelBadge = CreateImage(
+                _topBarRoot,
+                "LevelBadge",
+                _levelBadgeSprite != null ? Color.white : Color.clear);
+            levelBadge.sprite = _levelBadgeSprite;
+            levelBadge.preserveAspect = true;
+            levelBadge.rectTransform.anchorMin = new Vector2(0.62f, 0.1f);
+            levelBadge.rectTransform.anchorMax = new Vector2(0.98f, 0.9f);
+            levelBadge.rectTransform.offsetMin = Vector2.zero;
+            levelBadge.rectTransform.offsetMax = Vector2.zero;
+
             _levelLabel = CreateLabel(
-                _topBarRoot, "LevelLabel", "Level 1", fontSize, FontStyles.Bold);
-            _levelLabel.rectTransform.anchorMin = new Vector2(0.62f, 0.1f);
-            _levelLabel.rectTransform.anchorMax = new Vector2(0.98f, 0.9f);
-            _levelLabel.rectTransform.offsetMin = Vector2.zero;
-            _levelLabel.rectTransform.offsetMax = Vector2.zero;
-            _levelLabel.alignment = TextAlignmentOptions.MidlineRight;
+                levelBadge.transform, "LevelLabel", "Level 1", fontSize, FontStyles.Bold);
+            StretchFull(_levelLabel.rectTransform);
+
+            _topBarRoot.gameObject.SetActive(_gameplayElementsVisible);
         }
 
         private static GameConfigSO ResolveConfig()
@@ -360,34 +400,60 @@ namespace PixelFlowClone.UI.Screens
         {
             Transform child = parent.Find(childName);
             if (child != null)
-                Destroy(child.gameObject);
+                DestroyUiObject(child.gameObject);
+        }
+
+        private static void DestroyUiObject(GameObject target)
+        {
+            if (target == null)
+                return;
+
+            if (Application.isPlaying)
+                Destroy(target);
+            else
+                DestroyImmediate(target);
         }
 
         private static Button CreateHudButton(
             Transform parent,
             string name,
             string label,
+            Sprite icon,
             Vector2 anchorMin,
             Vector2 anchorMax,
             float fontSize,
             out TMP_Text labelText)
         {
-            Image image = CreateImage(parent, name, new Color(0.22f, 0.45f, 0.72f, 1f));
+            Image image = CreateImage(
+                parent,
+                name,
+                icon != null ? Color.white : new Color(0.22f, 0.45f, 0.72f, 1f));
             image.rectTransform.anchorMin = anchorMin;
             image.rectTransform.anchorMax = anchorMax;
             image.rectTransform.offsetMin = Vector2.zero;
             image.rectTransform.offsetMax = Vector2.zero;
             image.raycastTarget = true;
+            image.sprite = icon;
+            image.preserveAspect = icon != null;
 
             Button button = image.gameObject.AddComponent<Button>();
             ColorBlock colors = button.colors;
-            colors.highlightedColor = new Color(0.3f, 0.55f, 0.85f, 1f);
-            colors.pressedColor = new Color(0.15f, 0.35f, 0.55f, 1f);
+            colors.highlightedColor = icon != null
+                ? new Color(0.92f, 0.92f, 0.92f, 1f)
+                : new Color(0.3f, 0.55f, 0.85f, 1f);
+            colors.pressedColor = icon != null
+                ? new Color(0.78f, 0.78f, 0.78f, 1f)
+                : new Color(0.15f, 0.35f, 0.55f, 1f);
             button.colors = colors;
 
-            labelText = CreateLabel(image.transform, "Label", label, fontSize, FontStyles.Bold);
-            StretchFull(labelText.rectTransform);
-            labelText.raycastTarget = false;
+            labelText = null;
+            if (icon == null)
+            {
+                labelText = CreateLabel(image.transform, "Label", label, fontSize, FontStyles.Bold);
+                StretchFull(labelText.rectTransform);
+                labelText.raycastTarget = false;
+            }
+
             return button;
         }
 

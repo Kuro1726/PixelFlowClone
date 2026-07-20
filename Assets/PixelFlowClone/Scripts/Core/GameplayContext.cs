@@ -18,10 +18,16 @@ namespace PixelFlowClone.Core
         [SerializeField] private QueueManager _queue;
         [SerializeField] private InputManager _input;
         [SerializeField] private GameplayHUD _hud;
+        [SerializeField] private Sprite _victoryPanelSprite;
+        [SerializeField] private Sprite _victoryTitleBannerSprite;
+        [SerializeField] private Sprite _victoryTrophySprite;
+        [SerializeField] private Sprite _victoryTrophyWingSprite;
+        [SerializeField] private Sprite _victoryContinueButtonSprite;
         [SerializeField] private VictoryPopup _victoryPopup;
         [SerializeField] private DefeatPopup _defeatPopup;
         [SerializeField] private PausePopup _pausePopup;
         [SerializeField] private BlockConsumeVfx _consumeVfx;
+        [SerializeField] private CollectorShotVfx _shotVfx;
         [SerializeField] private GameplayBackground _background;
 
         public static GameplayContext Instance { get; private set; }
@@ -35,6 +41,7 @@ namespace PixelFlowClone.Core
         public DefeatPopup DefeatPopup => _defeatPopup;
         public PausePopup PausePopup => _pausePopup;
         public BlockConsumeVfx ConsumeVfx => _consumeVfx;
+        public CollectorShotVfx ShotVfx => _shotVfx;
         public GameplayBackground Background => _background;
 
         private void Awake()
@@ -53,7 +60,7 @@ namespace PixelFlowClone.Core
             EnsureVictoryPopup();
             EnsureDefeatPopup();
             EnsurePausePopup();
-            EnsureConsumeVfx();
+            EnsureShotVfx();
             EnsureBackground();
             RegisterWithUIManager();
         }
@@ -154,7 +161,13 @@ namespace PixelFlowClone.Core
             if (_victoryPopup != null)
                 return;
 
-            _victoryPopup = VictoryPopup.CreateRuntime(ResolveHudCanvasRoot());
+            _victoryPopup = VictoryPopup.CreateRuntime(
+                ResolveHudCanvasRoot(),
+                _victoryPanelSprite,
+                _victoryTitleBannerSprite,
+                _victoryTrophySprite,
+                _victoryTrophyWingSprite,
+                _victoryContinueButtonSprite);
             Debug.Log("[GameplayContext] Spawned runtime VictoryPopup.");
         }
 
@@ -195,6 +208,21 @@ namespace PixelFlowClone.Core
 
             _consumeVfx = BlockConsumeVfx.CreateRuntime(transform);
             Debug.Log("[GameplayContext] Spawned runtime BlockConsumeVfx.");
+        }
+
+        private void EnsureShotVfx()
+        {
+            if (_shotVfx == null)
+                _shotVfx = GetComponentInChildren<CollectorShotVfx>(true);
+
+            if (_shotVfx == null)
+                _shotVfx = FindFirstObjectByType<CollectorShotVfx>(FindObjectsInactive.Include);
+
+            if (_shotVfx != null)
+                return;
+
+            _shotVfx = CollectorShotVfx.CreateRuntime(transform);
+            Debug.Log("[GameplayContext] Spawned runtime CollectorShotVfx.");
         }
 
         private void EnsureBackground()

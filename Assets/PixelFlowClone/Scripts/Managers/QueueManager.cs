@@ -3,6 +3,7 @@ using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.Entities;
 using PixelFlowClone.Queue;
+using PixelFlowClone.Utils;
 using UnityEngine;
 
 namespace PixelFlowClone.Managers
@@ -92,7 +93,11 @@ namespace PixelFlowClone.Managers
             }
 
             ConveyorPathManager conveyor = ConveyorPathManager.Instance;
-            if (!conveyor.HasCapacity)
+            if (!QueueStateLogic.CanDispatchFromWaiting(
+                    unit.State,
+                    isWaitingFront: true,
+                    conveyor.ActiveCount,
+                    conveyor.MaxCapacity))
             {
                 PlayConveyorFullFeedback(unit);
                 return false;
@@ -125,6 +130,21 @@ namespace PixelFlowClone.Managers
 
             if (unit.State != CollectorState.OnConveyor || unit.Capacity <= 0)
                 return false;
+
+            if (!QueueStateLogic.CanEnqueueFromLap(
+                    unit.State,
+                    unit.Capacity,
+                    OccupiedSlots,
+                    MaxSlots))
+            {
+                Debug.Log("[QueueManager] Lap enqueue failed — queue is full. Defeat.");
+                if (GameManager.HasInstance)
+                    GameManager.Instance.DeclareDefeat();
+                else
+                    Debug.LogError("[QueueManager] Cannot declare defeat — GameManager missing.");
+
+                return false;
+            }
 
             int slotIndex = _queueSlots.TryAssignFirstEmpty(unit);
             if (slotIndex < 0)
@@ -182,7 +202,11 @@ namespace PixelFlowClone.Managers
             }
 
             ConveyorPathManager conveyor = ConveyorPathManager.Instance;
-            if (!conveyor.HasCapacity)
+            if (!QueueStateLogic.CanDispatchFromQueue(
+                    unit.State,
+                    isInQueueSlot: true,
+                    conveyor.ActiveCount,
+                    conveyor.MaxCapacity))
             {
                 PlayConveyorFullFeedback(unit);
                 return false;

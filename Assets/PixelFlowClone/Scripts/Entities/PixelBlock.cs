@@ -1,3 +1,4 @@
+using System.Collections;
 using PixelFlowClone.Data;
 using UnityEngine;
 
@@ -83,6 +84,47 @@ namespace PixelFlowClone.Entities
 
             IsConsumed = true;
             if (_collider != null) _collider.enabled = false;
+        }
+
+        /// <summary>
+        /// Plays the hit feedback after the collector shot reaches this block.
+        /// The collider is already disabled, so this animation is visual-only.
+        /// </summary>
+        public IEnumerator PlayHitDisappearAnimation(
+            float punchMultiplier,
+            float punchDuration,
+            float shrinkDuration)
+        {
+            Vector3 restScale = transform.localScale;
+            Vector3 punchScale = restScale * Mathf.Max(1f, punchMultiplier);
+
+            float elapsed = 0f;
+            punchDuration = Mathf.Max(0.01f, punchDuration);
+            while (elapsed < punchDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / punchDuration);
+                transform.localScale = Vector3.LerpUnclamped(
+                    restScale,
+                    punchScale,
+                    Mathf.SmoothStep(0f, 1f, t));
+                yield return null;
+            }
+
+            elapsed = 0f;
+            shrinkDuration = Mathf.Max(0.02f, shrinkDuration);
+            while (elapsed < shrinkDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / shrinkDuration);
+                transform.localScale = Vector3.LerpUnclamped(
+                    punchScale,
+                    Vector3.zero,
+                    t * t);
+                yield return null;
+            }
+
+            transform.localScale = Vector3.zero;
         }
 
         /// <summary>

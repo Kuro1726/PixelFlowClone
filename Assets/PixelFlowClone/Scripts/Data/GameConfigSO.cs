@@ -102,6 +102,35 @@ namespace PixelFlowClone.Data
         [Min(0f)]
         public float CollectorExitFlyDistance = 1.75f;
 
+        [Header("Collector Shot VFX")]
+        [Tooltip("Thời gian đạn bay từ Collector tới Block. Nhỏ hơn = bay nhanh hơn.")]
+        [Min(0.03f)]
+        public float CollectorShotTravelDuration = 0.16f;
+
+        [Tooltip("Kích thước đầu đạn trắng (world units).")]
+        [Min(0.03f)]
+        public float CollectorShotHeadSize = 0.12f;
+
+        [Tooltip("Độ rộng vệt sáng sau đuôi đạn (world units).")]
+        [Min(0.01f)]
+        public float CollectorShotTrailWidth = 0.055f;
+
+        [Tooltip("Thời gian vệt sáng tồn tại. Tăng = đuôi dài hơn.")]
+        [Min(0.02f)]
+        public float CollectorShotTrailTime = 0.18f;
+
+        [Tooltip("Mức phình của Block khi trúng đạn. 1.15 = lớn thêm 15%.")]
+        [Min(1f)]
+        public float BlockHitPunchScale = 1.15f;
+
+        [Tooltip("Thời gian Block phình lên khi trúng đạn.")]
+        [Min(0.01f)]
+        public float BlockHitPunchDuration = 0.07f;
+
+        [Tooltip("Thời gian Block thu nhỏ dần rồi biến mất.")]
+        [Min(0.02f)]
+        public float BlockHitShrinkDuration = 0.16f;
+
         private void OnEnable()
         {
             if (PixelBlockLayer.value == 0)

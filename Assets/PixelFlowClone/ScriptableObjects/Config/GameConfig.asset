@@ -35,7 +35,7 @@ MonoBehaviour:
   WaitingUnitSpacing: 1.5
   WaitingColumnSpacing: 1.5
   GameplayScreenScale: 1.6
-  CameraTopPad: 4.5
+  CameraTopPad: 5
   CameraWaitingStackDepth: 4.75
   CameraPadding: 0.35
   CameraHudScreenFraction: 0.1295
@@ -44,3 +44,10 @@ MonoBehaviour:
   HudFontSize: 32
   CollectorExitDuration: 0.35
   CollectorExitFlyDistance: 1.75
+  CollectorShotTravelDuration: 0.16
+  CollectorShotHeadSize: 0.2
+  CollectorShotTrailWidth: 0.05
+  CollectorShotTrailTime: 0.18
+  BlockHitPunchScale: 1.5
+  BlockHitPunchDuration: 0.15
+  BlockHitShrinkDuration: 0.05
