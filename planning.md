@@ -931,9 +931,9 @@ public static class DeadlockDetector
 **Mục tiêu Phase:** Core logic regression-safe, memory profile ổn định cho mobile.
 
 **Tiêu chí hoàn thành Phase 4:**
-- [x] Tất cả Edit Mode tests pass trong Test Runner.
-- [ ] Pool stress test: không GC spike đáng kể sau 100 cycles.
-- [ ] Android hoặc WebGL build compile thành công.
+- [x] Tất cả Edit Mode tests pass trong Test Runner. *(verified: P4-18 menu / Test Runner — all green)*
+- [x] Pool stress test: không GC spike đáng kể sau 100 cycles. *(Play Mode `PoolStressTests` PASS + CountAll ổn định; Profiler Hierarchy frame giữa ~26ms: GC Alloc ~87KB từ ScriptRunDelayed — nhiễu Editor/TestRunner, không Instantiate spike — 2026-07-20)*
+- [x] Android hoặc WebGL build compile thành công. *(WebGL smoke OK; Android APK `Builds/Android/android.apk` cài + chạy trên Pixel 7a emulator OK — 2026-07-20)*
 
 | # | Task | Kết quả mong đợi | Ghi chú kỹ thuật |
 |---|------|------------------|------------------|

@@ -53,6 +53,12 @@ namespace PixelFlowClone.Core
             if (!IsReady || !_loadMainMenuOnStart)
                 return;
 
+            if (BootstrapAutoLoad.Suppress)
+            {
+                Debug.Log("[Bootstrapper] Auto-load skipped (Play Mode tests own scene loading).");
+                return;
+            }
+
             if (string.IsNullOrEmpty(_nextSceneName))
             {
                 Debug.LogError("[Bootstrapper] Next scene name is empty.");
@@ -114,7 +120,7 @@ namespace PixelFlowClone.Core
                 return _loadingScreen;
             }
 
-            _loadingScreen = LoadingScreen.CreateRuntime();
+            _loadingScreen = LoadingScreen.Create();
             return _loadingScreen;
         }
     }

@@ -4,7 +4,8 @@ using UnityEngine;
 namespace PixelFlowClone.Editor
 {
     /// <summary>
-    /// P4-16: applies mobile Android player settings (portrait, package, SDK, ARM64, IL2CPP).
+    /// P4-16: applies mobile Android player settings (portrait, package, SDK, arches, IL2CPP).
+    /// Includes x86_64 so Android Studio x86 emulators can run the APK without ARM translation.
     /// Re-run from menu if Project Settings drift.
     /// </summary>
     public static class AndroidBuildSettingsApplier
@@ -32,8 +33,11 @@ namespace PixelFlowClone.Editor
             PlayerSettings.Android.minSdkVersion = (AndroidSdkVersions)MinSdk;
             PlayerSettings.Android.targetSdkVersion = (AndroidSdkVersions)TargetSdk;
 
+            // ARMv7+ARM64 for devices; x86_64 for Android Studio emulators.
             PlayerSettings.Android.targetArchitectures =
-                AndroidArchitecture.ARMv7 | AndroidArchitecture.ARM64;
+                AndroidArchitecture.ARMv7 |
+                AndroidArchitecture.ARM64 |
+                AndroidArchitecture.X86_64;
 
             PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, ScriptingImplementation.IL2CPP);
 
@@ -44,7 +48,7 @@ namespace PixelFlowClone.Editor
             Debug.Log(
                 "[PixelFlowClone] P4-16 Android settings applied: " +
                 $"Portrait, package={AndroidPackage}, minSdk={MinSdk}, targetSdk={TargetSdk}, " +
-                "ARMv7+ARM64, IL2CPP, Input System Only.");
+                "ARMv7+ARM64+x86_64, IL2CPP, Input System Only.");
         }
 
         /// <summary>

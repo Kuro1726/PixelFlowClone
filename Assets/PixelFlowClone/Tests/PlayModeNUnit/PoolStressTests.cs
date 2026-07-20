@@ -1,47 +1,60 @@
 using System.Collections;
 using NUnit.Framework;
+using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.Entities;
 using PixelFlowClone.Managers;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
 namespace PixelFlowClone.Tests.PlayMode
 {
     /// <summary>
-    /// P4-14: 100 get/release cycles. Open Profiler → GC Alloc while this runs to confirm
-    /// no Instantiate spike after the pool is warm (first gets may allocate up to pool size).
+    /// P4-14: 100 get/release cycles against PoolManager.
+    /// Explicitly loads SCN_Bootstrap — Play Mode Test Runner often enters Play on an empty
+    /// scene ("No cameras rendering"), so PoolManager would never appear otherwise.
     /// </summary>
     public class PoolStressTests
     {
         private const int Cycles = 100;
+        private const int YieldEvery = 10;
+        private const float SceneLoadTimeoutSeconds = 30f;
 
         [UnityTest]
         public IEnumerator Pool_Stress_100GetReleaseCycles_LeavesZeroActive()
         {
-            yield return PlayModeTestHelpers.LoadGameplayAndApplyLevel(0);
+            BootstrapAutoLoad.Suppress = true;
+            Debug.Log(
+                $"[P4-14] Pool stress starting — activeScene={SceneManager.GetActiveScene().name}, " +
+                $"hasPool={PoolManager.HasInstance}");
 
-            Assume.That(PoolManager.HasInstance, Is.True);
+            yield return EnsureBootstrapWithPoolManager();
+
             PoolManager pool = PoolManager.Instance;
+            Assert.That(pool, Is.Not.Null);
 
-            // Return level-spawned entities so the pool is fully inactive before stress.
-            ConveyorPathManager.Instance?.ClearActiveUnits();
-            QueueManager.Instance?.ClearAll();
-            GridManager.Instance?.ClearGrid();
+            if (ConveyorPathManager.HasInstance)
+                ConveyorPathManager.Instance.ClearActiveUnits();
+            if (QueueManager.HasInstance)
+                QueueManager.Instance.ClearAll();
+            if (GridManager.HasInstance)
+                GridManager.Instance.ClearGrid();
             yield return null;
 
-            Assume.That(pool.CollectorCountActive, Is.EqualTo(0),
-                "Collectors still active after clearing gameplay — cannot stress-test pool.");
-            Assume.That(pool.BlockCountActive, Is.EqualTo(0),
-                "Blocks still active after clearing gameplay — cannot stress-test pool.");
+            Assert.That(pool.CollectorCountActive, Is.EqualTo(0),
+                "Collectors still active — cannot stress-test pool.");
+            Assert.That(pool.BlockCountActive, Is.EqualTo(0),
+                "Blocks still active — cannot stress-test pool.");
 
-            // Warm / stabilize before measuring cycles.
+            Debug.Log("[P4-14] Cleared active pool users — warming pool…");
+
             for (int i = 0; i < 8; i++)
             {
                 CollectorUnit warmCollector = pool.GetCollector();
                 PixelBlock warmBlock = pool.GetPixelBlock();
-                Assume.That(warmCollector, Is.Not.Null);
-                Assume.That(warmBlock, Is.Not.Null);
+                Assert.That(warmCollector, Is.Not.Null);
+                Assert.That(warmBlock, Is.Not.Null);
 
                 warmCollector.Initialize(ColorId.Red, 1);
                 warmBlock.Initialize(ColorId.Blue, Vector2Int.zero, Vector3.zero, 1f);
@@ -49,8 +62,14 @@ namespace PixelFlowClone.Tests.PlayMode
                 pool.ReleasePixelBlock(warmBlock);
             }
 
+            yield return null;
+
             int collectorsBefore = pool.CollectorCountAll;
             int blocksBefore = pool.BlockCountAll;
+            Debug.Log(
+                $"[P4-14] Warm done — start {Cycles} cycles " +
+                $"(collectorsAll={collectorsBefore}, blocksAll={blocksBefore}). " +
+                "Profiler: measure GC Alloc from here.");
 
             for (int i = 0; i < Cycles; i++)
             {
@@ -65,6 +84,9 @@ namespace PixelFlowClone.Tests.PlayMode
 
                 pool.ReleaseCollector(unit);
                 pool.ReleasePixelBlock(block);
+
+                if ((i + 1) % YieldEvery == 0)
+                    yield return null;
             }
 
             Assert.That(pool.CollectorCountActive, Is.EqualTo(0));
@@ -80,6 +102,61 @@ namespace PixelFlowClone.Tests.PlayMode
                 "Profiler: expect flat GC Alloc after warm-up (no per-cycle Instantiate).");
 
             yield return null;
+        }
+
+        private static IEnumerator EnsureBootstrapWithPoolManager()
+        {
+            if (PoolManager.HasInstance)
+            {
+                Debug.Log("[P4-14] PoolManager already present.");
+                yield break;
+            }
+
+            string bootstrap = SceneLoader.BootstrapSceneName;
+            Assert.That(
+                Application.CanStreamedLevelBeLoaded(bootstrap),
+                Is.True,
+                $"Scene '{bootstrap}' is not in Build Settings.");
+
+            Debug.Log(
+                $"[P4-14] PoolManager missing (likely empty Play Mode scene / no cameras). " +
+                $"Loading '{bootstrap}'…");
+
+            AsyncOperation load = SceneManager.LoadSceneAsync(bootstrap, LoadSceneMode.Single);
+            Assert.That(load, Is.Not.Null, $"LoadSceneAsync('{bootstrap}') returned null.");
+
+            int frames = 0;
+            int maxFrames = Mathf.CeilToInt(SceneLoadTimeoutSeconds * 60f);
+            while (!load.isDone)
+            {
+                frames++;
+                if (frames > maxFrames)
+                {
+                    Assert.Fail(
+                        $"Timed out loading '{bootstrap}' after ~{SceneLoadTimeoutSeconds}s. " +
+                        $"Active={SceneManager.GetActiveScene().name}");
+                    yield break;
+                }
+
+                yield return null;
+            }
+
+            // Awake/Start of PoolManager run after scene activation.
+            yield return null;
+            yield return null;
+
+            if (!PoolManager.HasInstance)
+            {
+                PoolManager found = Object.FindFirstObjectByType<PoolManager>();
+                Assert.That(
+                    found,
+                    Is.Not.Null,
+                    $"'{bootstrap}' loaded but no PoolManager in scene. Check SCN_Bootstrap setup.");
+            }
+
+            Debug.Log(
+                $"[P4-14] Bootstrap ready — active={SceneManager.GetActiveScene().name}, " +
+                $"hasPool={PoolManager.HasInstance}");
         }
     }
 }

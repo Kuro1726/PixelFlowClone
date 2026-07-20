@@ -196,7 +196,7 @@ namespace PixelFlowClone.Managers
 
             ReclaimGameplayEntities();
 
-            LoadingScreen loading = LoadingScreen.CreateRuntime(transform);
+            LoadingScreen loading = LoadingScreen.Create(transform);
             loading.SetTitle(LoadingScreen.DefaultTitle);
             loading.SetStatus(LoadingScreen.DefaultStatus);
             loading.SetProgress(0f);
@@ -243,7 +243,7 @@ namespace PixelFlowClone.Managers
             if (GameManager.HasInstance)
                 GameManager.Instance.BeginLoading();
 
-            LoadingScreen loading = LoadingScreen.CreateRuntime(transform);
+            LoadingScreen loading = LoadingScreen.Create(transform);
             loading.SetTitle(LoadingScreen.DefaultTitle);
             loading.SetStatus(LoadingScreen.DefaultStatus);
             loading.SetProgress(0f);
