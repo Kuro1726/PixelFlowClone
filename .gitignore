@@ -1,11 +1,11 @@
 # Unity generated
-/[Ll]ibrary/
-/[Tt]emp/
-/[Oo]bj/
-/[Bb]uild/
-/[Bb]uilds/
-/[Ll]ogs/
-/[Uu]ser[Ss]ettings/
+PixelFlowCloneUnity/[Ll]ibrary/
+PixelFlowCloneUnity/[Tt]emp/
+PixelFlowCloneUnity/[Oo]bj/
+PixelFlowCloneUnity/[Bb]uild/
+PixelFlowCloneUnity/[Bb]uilds/
+PixelFlowCloneUnity/[Ll]ogs/
+PixelFlowCloneUnity/[Uu]ser[Ss]ettings/
 *.log
 
 # Visual Studio / Rider
@@ -23,3 +23,8 @@
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude Code local settings (machine-specific paths)
+.claude/settings.local.json
+
+
