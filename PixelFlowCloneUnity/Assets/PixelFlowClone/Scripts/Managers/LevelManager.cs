@@ -25,6 +25,9 @@ namespace PixelFlowClone.Managers
         [SerializeField, Min(0f)] private float _gameplayLoadMinSeconds = 3f;
 
         private Coroutine _playRoutine;
+        private int _lastGameplayPixelWidth = -1;
+        private int _lastGameplayPixelHeight = -1;
+        private Rect _lastGameplaySafeArea;
 
         /// <summary>
         /// Runtime override from Bootstrapper. Kept separate from <see cref="_levels"/> so the
@@ -80,6 +83,29 @@ namespace PixelFlowClone.Managers
 
             int savedIndex = Mathf.Clamp(CurrentLevelIndex, 0, levels.Length - 1);
             LoadLevel(savedIndex);
+        }
+
+        private void LateUpdate()
+        {
+            GameplayContext context = GameplayContext.Instance;
+            Camera camera = Camera.main;
+            if (CurrentLevel == null || context == null || context.Grid == null || camera == null)
+                return;
+
+            Rect safeArea = Screen.safeArea;
+            if (camera.pixelWidth == _lastGameplayPixelWidth &&
+                camera.pixelHeight == _lastGameplayPixelHeight &&
+                safeArea == _lastGameplaySafeArea)
+            {
+                return;
+            }
+
+            _lastGameplayPixelWidth = camera.pixelWidth;
+            _lastGameplayPixelHeight = camera.pixelHeight;
+            _lastGameplaySafeArea = safeArea;
+
+            FitGameplayCamera(CurrentLevel);
+            FitGameplayBackground();
         }
 
         public bool IsLevelUnlocked(int index)

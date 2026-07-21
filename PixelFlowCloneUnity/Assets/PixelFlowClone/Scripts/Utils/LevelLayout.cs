@@ -405,7 +405,10 @@ namespace PixelFlowClone.Utils
             float aspect = camera.aspect > 0.01f ? camera.aspect : (9f / 16f);
             float sizeForHeight = height * 0.5f;
             float sizeForWidth = width * 0.5f / aspect;
-            float size = Mathf.Max(sizeForHeight, sizeForWidth, 1f) * DefaultCameraFitSafety / screenScale;
+            float fittedSize = Mathf.Max(sizeForHeight, sizeForWidth, 1f) * DefaultCameraFitSafety;
+            float zoomedSize = fittedSize / screenScale;
+            float minimumWidthSize = sizeForWidth * DefaultCameraFitSafety;
+            float size = Mathf.Max(zoomedSize, minimumWidthSize, 1f);
 
             float topOfView = centerY + size;
             float desiredContentTop = topOfView - size * 2f * hudFraction;

@@ -27,6 +27,9 @@ namespace PixelFlowClone.UI.Screens
         [SerializeField] private TMP_Text _pauseButtonLabel;
         [SerializeField] private TMP_Text _levelLabel;
         [SerializeField] private TMP_Text _conveyorLabel;
+        private RectTransform _safeAreaRoot;
+        private Rect _lastSafeArea;
+        private Vector2Int _lastScreenSize;
         private bool _gameplayElementsVisible = true;
 
         public Button PauseButton => _pauseButton;
@@ -42,6 +45,8 @@ namespace PixelFlowClone.UI.Screens
                 RebuildUi();
             else
                 WirePauseButton();
+            EnsureSafeArea();
+            ApplySafeArea();
             ApplyGameplayFonts();
             RefreshLevelLabel();
             RefreshConveyorIndicator();
@@ -60,6 +65,8 @@ namespace PixelFlowClone.UI.Screens
         {
             GameEvents.OnConveyorCountChanged -= HandleConveyorCountChanged;
             GameEvents.OnConveyorCountChanged += HandleConveyorCountChanged;
+            EnsureSafeArea();
+            ApplySafeArea();
             SubscribeManagers();
             WirePauseButton();
             RefreshLevelLabel();
@@ -72,6 +79,14 @@ namespace PixelFlowClone.UI.Screens
             GameEvents.OnConveyorCountChanged -= HandleConveyorCountChanged;
             UnsubscribeManagers();
             UnwirePauseButton();
+        }
+
+        private void OnRectTransformDimensionsChange()
+        {
+            if (!Application.isPlaying || _safeAreaRoot == null)
+                return;
+
+            ApplySafeArea();
         }
 
         private void SubscribeManagers()
@@ -133,6 +148,66 @@ namespace PixelFlowClone.UI.Screens
                    _pauseButton != null &&
                    _levelLabel != null &&
                    _conveyorLabel != null;
+        }
+
+        private void EnsureSafeArea()
+        {
+            Canvas canvas = GetComponent<Canvas>();
+            if (canvas == null)
+                canvas = GetComponentInChildren<Canvas>();
+            if (canvas == null)
+                return;
+
+            RectTransform canvasRoot = canvas.transform as RectTransform;
+            if (canvasRoot == null)
+                return;
+
+            if (_safeAreaRoot == null)
+            {
+                Transform existing = canvasRoot.Find("SafeArea");
+                if (existing != null)
+                    _safeAreaRoot = existing as RectTransform;
+            }
+
+            if (_safeAreaRoot == null)
+            {
+                var safeAreaObject = new GameObject("SafeArea", typeof(RectTransform));
+                _safeAreaRoot = safeAreaObject.GetComponent<RectTransform>();
+                _safeAreaRoot.SetParent(canvasRoot, false);
+                _safeAreaRoot.anchorMin = Vector2.zero;
+                _safeAreaRoot.anchorMax = Vector2.one;
+                _safeAreaRoot.offsetMin = Vector2.zero;
+                _safeAreaRoot.offsetMax = Vector2.zero;
+            }
+
+            if (_topBarRoot != null && _topBarRoot.parent != _safeAreaRoot)
+                _topBarRoot.SetParent(_safeAreaRoot, false);
+        }
+
+        private void ApplySafeArea()
+        {
+            if (_safeAreaRoot == null || Screen.width <= 0 || Screen.height <= 0)
+                return;
+
+            Rect safeArea = Screen.safeArea;
+            var screenSize = new Vector2Int(Screen.width, Screen.height);
+            if (safeArea == _lastSafeArea && screenSize == _lastScreenSize)
+                return;
+
+            _lastSafeArea = safeArea;
+            _lastScreenSize = screenSize;
+
+            Vector2 anchorMin = safeArea.position;
+            Vector2 anchorMax = safeArea.position + safeArea.size;
+            anchorMin.x /= screenSize.x;
+            anchorMin.y /= screenSize.y;
+            anchorMax.x /= screenSize.x;
+            anchorMax.y /= screenSize.y;
+
+            _safeAreaRoot.anchorMin = anchorMin;
+            _safeAreaRoot.anchorMax = anchorMax;
+            _safeAreaRoot.offsetMin = Vector2.zero;
+            _safeAreaRoot.offsetMax = Vector2.zero;
         }
 
         private void ApplyGameplayFonts()
