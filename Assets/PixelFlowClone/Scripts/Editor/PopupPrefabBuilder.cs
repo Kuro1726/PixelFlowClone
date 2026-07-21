@@ -65,7 +65,8 @@ namespace PixelFlowClone.Editor
             {
                 PausePopup popup = contents.GetComponent<PausePopup>();
                 if (popup == null ||
-                    (popup.HasSettingsControls && popup.HasRestartArtwork &&
+                    (popup.HasSettingsControls && popup.HasSettingsArtwork &&
+                     popup.HasRestartArtwork &&
                      popup.HasHomeArtwork && popup.HasCloseArtwork && popup.UsesDirectHeaderEditing))
                     return false;
 

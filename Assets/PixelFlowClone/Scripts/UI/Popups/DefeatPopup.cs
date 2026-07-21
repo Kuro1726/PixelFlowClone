@@ -77,8 +77,6 @@ namespace PixelFlowClone.UI.Popups
             if (transform.Find("Panel") == null)
                 BuildRuntimeUi();
 
-            EnsureCloseButton();
-            EnsureMainMenuButton();
             ApplyPanelArtwork();
             ApplyRestartButtonArtwork();
             ApplyCloseButtonArtwork();
@@ -123,8 +121,6 @@ namespace PixelFlowClone.UI.Popups
             if (transform.Find("Panel") == null)
                 BuildRuntimeUi();
 
-            EnsureCloseButton();
-            EnsureMainMenuButton();
             ApplyPanelArtwork();
             ApplyRestartButtonArtwork();
             ApplyCloseButtonArtwork();
@@ -151,7 +147,10 @@ namespace PixelFlowClone.UI.Popups
             if (_closeButton == null)
                 _closeButton = panel.Find("CloseButton")?.GetComponent<Button>();
             if (_mainMenuButton == null)
-                _mainMenuButton = panel.Find("MainMenuButton")?.GetComponent<Button>();
+            {
+                Transform home = panel.Find("MainMenuButton") ?? panel.Find("HomeButton");
+                _mainMenuButton = home != null ? home.GetComponent<Button>() : null;
+            }
         }
 
         private void EnsureCanvasGroup()

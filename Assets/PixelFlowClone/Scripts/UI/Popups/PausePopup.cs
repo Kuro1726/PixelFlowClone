@@ -22,6 +22,14 @@ namespace PixelFlowClone.UI.Popups
             "UI/Popups/Pause/ReturnHomeButton_Cutout";
         private const string CloseButtonResourcePath =
             "UI/Popups/Pause/CloseButton_Cutout";
+        private const string SoundIconResourcePath =
+            "UI/Settings/SoundIcon_Cutout";
+        private const string HapticIconResourcePath =
+            "UI/Settings/HapticIcon_Cutout";
+        private const string ToggleOffResourcePath =
+            "UI/Settings/ToggleOff_Cutout";
+        private const string ToggleOnResourcePath =
+            "UI/Settings/ToggleOn_Cutout";
         private const string PrefabResourcePath = "UI/PF_PausePopup";
 
         [SerializeField] private CanvasGroup _canvasGroup;
@@ -32,8 +40,15 @@ namespace PixelFlowClone.UI.Popups
         [SerializeField] private TMP_Text _titleLabel;
         [SerializeField] private Button _audioToggleButton;
         [SerializeField] private TMP_Text _audioToggleLabel;
+        [SerializeField] private Image _audioIconImage;
+        [SerializeField] private Image _audioToggleStateImage;
         [SerializeField] private Button _hapticToggleButton;
         [SerializeField] private TMP_Text _hapticToggleLabel;
+        [SerializeField] private Image _hapticIconImage;
+        [SerializeField] private Image _hapticToggleStateImage;
+
+        private Sprite _toggleOffSprite;
+        private Sprite _toggleOnSprite;
 
         public event Action ResumeClicked;
         public event Action RestartClicked;
@@ -41,6 +56,13 @@ namespace PixelFlowClone.UI.Popups
 
         public bool HasSettingsControls =>
             _audioToggleButton != null && _hapticToggleButton != null;
+        public bool HasSettingsArtwork =>
+            _audioIconImage != null && _audioIconImage.sprite != null &&
+            _audioToggleStateImage != null &&
+            _hapticIconImage != null && _hapticIconImage.sprite != null &&
+            _hapticToggleStateImage != null &&
+            Resources.Load<Sprite>(ToggleOffResourcePath) != null &&
+            Resources.Load<Sprite>(ToggleOnResourcePath) != null;
         public bool HasRestartArtwork =>
             _restartButton != null && _restartButton.GetComponent<Image>()?.sprite != null;
         public bool HasHomeArtwork =>
@@ -57,6 +79,7 @@ namespace PixelFlowClone.UI.Popups
                 BuildRuntimeUi();
 
             EnsureSettingsControls();
+            EnsureSettingsArtwork();
             ApplyRestartButtonArtwork();
             ApplyHomeButtonArtwork();
             ApplyCloseButtonArtwork();
@@ -113,6 +136,7 @@ namespace PixelFlowClone.UI.Popups
                 BuildRuntimeUi();
 
             EnsureSettingsControls();
+            EnsureSettingsArtwork();
             ApplyRestartButtonArtwork();
             ApplyHomeButtonArtwork();
             ApplyCloseButtonArtwork();
@@ -197,17 +221,18 @@ namespace PixelFlowClone.UI.Popups
             if (_hapticToggleLabel != null)
                 _hapticToggleLabel.text = GameSettings.HapticEnabled ? "Haptic: ON" : "Haptic: OFF";
 
-            ApplyToggleColor(_audioToggleButton, GameSettings.AudioEnabled);
-            ApplyToggleColor(_hapticToggleButton, GameSettings.HapticEnabled);
+            ApplyToggleArtwork(_audioToggleStateImage, GameSettings.AudioEnabled);
+            ApplyToggleArtwork(_hapticToggleStateImage, GameSettings.HapticEnabled);
         }
 
-        private static void ApplyToggleColor(Button button, bool enabled)
+        private void ApplyToggleArtwork(Image stateImage, bool enabled)
         {
-            Image image = button != null ? button.GetComponent<Image>() : null;
-            if (image != null)
-                image.color = enabled
-                    ? new Color(0.25f, 0.72f, 0.42f, 1f)
-                    : new Color(0.42f, 0.38f, 0.48f, 1f);
+            if (stateImage == null)
+                return;
+
+            Sprite sprite = enabled ? _toggleOnSprite : _toggleOffSprite;
+            if (sprite != null)
+                stateImage.sprite = sprite;
         }
 
         private void HandleResumeClicked()
@@ -383,6 +408,96 @@ namespace PixelFlowClone.UI.Popups
                     new Color(0.25f, 0.72f, 0.42f, 1f));
                 _hapticToggleLabel = _hapticToggleButton.transform.Find("Label")?.GetComponent<TMP_Text>();
             }
+        }
+
+        private void EnsureSettingsArtwork()
+        {
+            Sprite soundIcon = Resources.Load<Sprite>(SoundIconResourcePath);
+            Sprite hapticIcon = Resources.Load<Sprite>(HapticIconResourcePath);
+            _toggleOffSprite = Resources.Load<Sprite>(ToggleOffResourcePath);
+            _toggleOnSprite = Resources.Load<Sprite>(ToggleOnResourcePath);
+
+            if (soundIcon == null || hapticIcon == null ||
+                _toggleOffSprite == null || _toggleOnSprite == null)
+            {
+                Debug.LogWarning("[PausePopup] One or more settings sprites could not be loaded.");
+                return;
+            }
+
+            _audioIconImage = EnsureArtworkImage(
+                _audioToggleButton, "SoundIcon", soundIcon,
+                new Vector2(0f, 0f), new Vector2(0.42f, 1f));
+            _audioToggleStateImage = EnsureArtworkImage(
+                _audioToggleButton, "ToggleState", _toggleOnSprite,
+                new Vector2(0.38f, 0f), new Vector2(1f, 1f));
+
+            _hapticIconImage = EnsureArtworkImage(
+                _hapticToggleButton, "HapticIcon", hapticIcon,
+                new Vector2(0f, 0f), new Vector2(0.42f, 1f));
+            _hapticToggleStateImage = EnsureArtworkImage(
+                _hapticToggleButton, "ToggleState", _toggleOnSprite,
+                new Vector2(0.38f, 0f), new Vector2(1f, 1f));
+
+            ConfigureArtworkButton(
+                _audioToggleButton, _audioToggleLabel, _audioToggleStateImage);
+            ConfigureArtworkButton(
+                _hapticToggleButton, _hapticToggleLabel, _hapticToggleStateImage);
+        }
+
+        private static Image EnsureArtworkImage(
+            Button button,
+            string name,
+            Sprite sprite,
+            Vector2 anchorMin,
+            Vector2 anchorMax)
+        {
+            if (button == null || sprite == null)
+                return null;
+
+            Transform existing = button.transform.Find(name);
+            Image image = existing != null ? existing.GetComponent<Image>() : null;
+            if (image == null)
+                image = CreateImage(button.transform, name, Color.white);
+
+            RectTransform rect = image.rectTransform;
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            image.sprite = sprite;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = true;
+            image.color = Color.white;
+            image.raycastTarget = false;
+            return image;
+        }
+
+        private static void ConfigureArtworkButton(
+            Button button,
+            TMP_Text label,
+            Image toggleStateImage)
+        {
+            if (button == null || toggleStateImage == null)
+                return;
+
+            Image background = button.GetComponent<Image>();
+            if (background != null)
+            {
+                background.sprite = null;
+                background.color = Color.clear;
+            }
+
+            if (label != null)
+                label.gameObject.SetActive(false);
+
+            button.targetGraphic = toggleStateImage;
+            ColorBlock colors = button.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1f, 1f, 1f, 0.9f);
+            colors.pressedColor = new Color(0.72f, 0.82f, 1f, 1f);
+            colors.selectedColor = Color.white;
+            button.colors = colors;
         }
 
         private void ApplyRestartButtonArtwork()

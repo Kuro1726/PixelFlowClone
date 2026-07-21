@@ -13,7 +13,7 @@ using UnityEngine.UI;
 namespace PixelFlowClone.UI.Screens
 {
     /// <summary>
-    /// Main menu: Play opens level pick, then loads gameplay. Also Instructions / Settings.
+    /// Main menu: Play opens level pick, then loads gameplay. Also provides Settings.
     /// </summary>
     public class MainMenuScreen : MonoBehaviour
     {
@@ -21,9 +21,10 @@ namespace PixelFlowClone.UI.Screens
 
         [SerializeField] private Sprite _backgroundSprite;
         [SerializeField] private Sprite _playButtonSprite;
+        [SerializeField] private Sprite _levelButtonSprite;
+        [SerializeField] private Button _levelButtonPrefab;
         [SerializeField] private TMP_Text _titleText;
         [SerializeField] private Button _playButton;
-        [SerializeField] private Button _instructionsButton;
         [SerializeField] private Button _settingsButton;
         [SerializeField] private Button _backButton;
         [SerializeField] private RectTransform _mainButtonsRoot;
@@ -32,9 +33,10 @@ namespace PixelFlowClone.UI.Screens
         [SerializeField] private string _title = DefaultTitle;
 
         public event Action PlayClicked;
-        public event Action InstructionsClicked;
         public event Action SettingsClicked;
         public event Action<int> LevelChosen;
+
+        public Button LevelButtonPrefab => _levelButtonPrefab;
 
         private readonly List<Button> _levelButtons = new();
 
@@ -42,9 +44,13 @@ namespace PixelFlowClone.UI.Screens
         {
             EnsureEventSystem();
 
-            if (_playButton == null || _instructionsButton == null || _settingsButton == null)
+            RemoveObsoleteInstructionsButton();
+
+            if (_playButton == null || _settingsButton == null)
                 BuildRuntimeUi();
 
+            ConfigureMainButtonsLayout();
+            ApplyConfiguredButtonArtwork();
             EnsureSettingsPopup();
 
             if (_titleText != null)
@@ -72,9 +78,13 @@ namespace PixelFlowClone.UI.Screens
         /// </summary>
         public void BuildEditableUi()
         {
-            if (_playButton == null || _instructionsButton == null || _settingsButton == null)
+            RemoveObsoleteInstructionsButton();
+
+            if (_playButton == null || _settingsButton == null)
                 BuildRuntimeUi();
 
+            ConfigureMainButtonsLayout();
+            ApplyConfiguredButtonArtwork();
             EnsureSettingsPopup();
             if (_settingsPopup != null)
                 _settingsPopup.BuildEditableUi();
@@ -84,10 +94,19 @@ namespace PixelFlowClone.UI.Screens
         /// Supplies artwork when an editor utility creates this screen from scratch.
         /// Existing scene instances normally keep these values through serialization.
         /// </summary>
-        public void SetArtwork(Sprite backgroundSprite, Sprite playButtonSprite)
+        public void SetArtwork(
+            Sprite backgroundSprite,
+            Sprite playButtonSprite,
+            Sprite levelButtonSprite)
         {
             _backgroundSprite = backgroundSprite;
             _playButtonSprite = playButtonSprite;
+            _levelButtonSprite = levelButtonSprite;
+        }
+
+        public void SetLevelButtonPrefab(Button levelButtonPrefab)
+        {
+            _levelButtonPrefab = levelButtonPrefab;
         }
 
         [ContextMenu("Make Main Menu Editable")]
@@ -134,12 +153,6 @@ namespace PixelFlowClone.UI.Screens
                 _playButton.onClick.AddListener(HandlePlayClicked);
             }
 
-            if (_instructionsButton != null)
-            {
-                _instructionsButton.onClick.RemoveListener(HandleInstructionsClicked);
-                _instructionsButton.onClick.AddListener(HandleInstructionsClicked);
-            }
-
             if (_settingsButton != null)
             {
                 _settingsButton.onClick.RemoveListener(HandleSettingsClicked);
@@ -157,8 +170,6 @@ namespace PixelFlowClone.UI.Screens
         {
             if (_playButton != null)
                 _playButton.onClick.RemoveListener(HandlePlayClicked);
-            if (_instructionsButton != null)
-                _instructionsButton.onClick.RemoveListener(HandleInstructionsClicked);
             if (_settingsButton != null)
                 _settingsButton.onClick.RemoveListener(HandleSettingsClicked);
             if (_backButton != null)
@@ -181,12 +192,6 @@ namespace PixelFlowClone.UI.Screens
         private void HandleBackClicked()
         {
             ShowMainButtons();
-        }
-
-        private void HandleInstructionsClicked()
-        {
-            Debug.Log("[MainMenu] Instructions clicked");
-            InstructionsClicked?.Invoke();
         }
 
         private void HandleSettingsClicked()
@@ -285,6 +290,13 @@ namespace PixelFlowClone.UI.Screens
             if (canvas != null)
                 canvasRoot = canvas.transform;
 
+            _settingsPopup = GetComponentInChildren<SettingsPopup>(true);
+            if (_settingsPopup != null)
+            {
+                _settingsPopup.Hide();
+                return;
+            }
+
             _settingsPopup = SettingsPopup.CreateRuntime(canvasRoot);
             _settingsPopup.Hide();
         }
@@ -324,6 +336,16 @@ namespace PixelFlowClone.UI.Screens
                 gridRoot = gridGo.transform;
             }
 
+            GridLayoutGroup levelGrid = gridRoot.GetComponent<GridLayoutGroup>();
+            RectTransform prefabRect = _levelButtonPrefab != null
+                ? _levelButtonPrefab.transform as RectTransform
+                : null;
+            if (levelGrid != null && prefabRect != null &&
+                prefabRect.sizeDelta.x > 0f && prefabRect.sizeDelta.y > 0f)
+            {
+                levelGrid.cellSize = prefabRect.sizeDelta;
+            }
+
             if (!LevelManager.HasInstance)
                 return;
 
@@ -336,13 +358,21 @@ namespace PixelFlowClone.UI.Screens
                     label += "\nLocked";
 
                 int index = i;
-                Button button = CreateMenuButton(
-                    gridRoot,
-                    $"LevelButton_{i}",
-                    label,
-                    Vector2.zero,
-                    Vector2.one,
-                    stretchToParent: false);
+                bool usesPrefab = _levelButtonPrefab != null;
+                Button button = usesPrefab
+                    ? Instantiate(_levelButtonPrefab, gridRoot, false)
+                    : CreateMenuButton(
+                        gridRoot,
+                        $"LevelButton_{i}",
+                        label,
+                        Vector2.zero,
+                        Vector2.one,
+                        stretchToParent: false);
+                button.name = $"LevelButton_{i}";
+
+                TMP_Text labelText = button.GetComponentInChildren<TMP_Text>(true);
+                if (labelText != null)
+                    labelText.text = label;
 
                 RectTransform rect = button.transform as RectTransform;
                 if (rect != null)
@@ -351,11 +381,8 @@ namespace PixelFlowClone.UI.Screens
                     rect.anchoredPosition = Vector2.zero;
                 }
 
-                Image image = button.GetComponent<Image>();
-                if (image != null)
-                    image.color = unlocked
-                        ? new Color(0.22f, 0.45f, 0.72f, 1f)
-                        : new Color(0.25f, 0.27f, 0.32f, 1f);
+                if (!usesPrefab)
+                    ApplyLevelButtonArtwork(button, _levelButtonSprite, unlocked);
 
                 button.interactable = unlocked;
                 if (unlocked)
@@ -439,12 +466,14 @@ namespace PixelFlowClone.UI.Screens
             StretchFull(_mainButtonsRoot);
 
             _playButton = CreateMenuButton(
-                _mainButtonsRoot, "PlayButton", "Play", new Vector2(0.2f, 0.455f), new Vector2(0.8f, 0.58f));
-            ApplyPlayButtonArtwork(_playButton, _playButtonSprite);
-            _instructionsButton = CreateMenuButton(
-                _mainButtonsRoot, "InstructionsButton", "Instructions", new Vector2(0.2f, 0.36f), new Vector2(0.8f, 0.46f));
+                _mainButtonsRoot, "PlayButton", "Play",
+                new Vector2(0.2f, 0.455f), new Vector2(0.8f, 0.58f),
+                labelFontSize: 64f);
+            ApplyMenuButtonArtwork(_playButton, _playButtonSprite);
             _settingsButton = CreateMenuButton(
-                _mainButtonsRoot, "SettingsButton", "Settings", new Vector2(0.2f, 0.24f), new Vector2(0.8f, 0.34f));
+                _mainButtonsRoot, "SettingsButton", "Settings",
+                new Vector2(0.2f, 0.32f), new Vector2(0.8f, 0.42f),
+                labelFontSize: 64f);
 
             var levelGo = new GameObject("LevelSelect", typeof(RectTransform));
             levelGo.transform.SetParent(root, false);
@@ -453,12 +482,51 @@ namespace PixelFlowClone.UI.Screens
             levelGo.SetActive(false);
 
             _backButton = CreateMenuButton(
-                _levelSelectRoot, "BackButton", "Back", new Vector2(0.2f, 0.12f), new Vector2(0.8f, 0.20f));
+                _levelSelectRoot, "BackButton", "Back",
+                new Vector2(0.2f, 0.12f), new Vector2(0.8f, 0.20f),
+                labelFontSize: 64f);
 
             EnsureSettingsPopup();
         }
 
-        private static void ApplyPlayButtonArtwork(Button button, Sprite artworkSprite)
+        private void RemoveObsoleteInstructionsButton()
+        {
+            if (_mainButtonsRoot == null)
+                return;
+
+            Transform instructions = _mainButtonsRoot.Find("InstructionsButton");
+            if (instructions == null)
+                return;
+
+            if (Application.isPlaying)
+                Destroy(instructions.gameObject);
+            else
+                DestroyImmediate(instructions.gameObject);
+        }
+
+        private void ConfigureMainButtonsLayout()
+        {
+            if (_settingsButton == null)
+                return;
+
+            RectTransform settingsRect = _settingsButton.transform as RectTransform;
+            if (settingsRect == null)
+                return;
+
+            settingsRect.anchorMin = new Vector2(0.2f, 0.32f);
+            settingsRect.anchorMax = new Vector2(0.8f, 0.42f);
+            settingsRect.offsetMin = Vector2.zero;
+            settingsRect.offsetMax = Vector2.zero;
+        }
+
+        private void ApplyConfiguredButtonArtwork()
+        {
+            ApplyMenuButtonArtwork(_playButton, _playButtonSprite);
+            ApplyMenuButtonArtwork(_settingsButton, _playButtonSprite);
+            ApplyMenuButtonArtwork(_backButton, _playButtonSprite);
+        }
+
+        private static void ApplyMenuButtonArtwork(Button button, Sprite artworkSprite)
         {
             if (button == null || artworkSprite == null)
                 return;
@@ -470,10 +538,21 @@ namespace PixelFlowClone.UI.Screens
                 hitArea.color = Color.clear;
             }
 
-            Image artwork = CreateImage(button.transform, "Artwork", Color.white);
+            Transform artworkTransform = button.transform.Find("Artwork");
+            Image artwork = artworkTransform != null
+                ? artworkTransform.GetComponent<Image>()
+                : null;
+            if (artwork == null)
+            {
+                artwork = artworkTransform != null
+                    ? artworkTransform.gameObject.AddComponent<Image>()
+                    : CreateImage(button.transform, "Artwork", Color.white);
+            }
+
             artwork.sprite = artworkSprite;
             artwork.type = Image.Type.Simple;
             artwork.preserveAspect = true;
+            artwork.color = Color.white;
             artwork.raycastTarget = false;
 
             // The generated PNG contains transparent padding. This size makes its visible
@@ -495,12 +574,43 @@ namespace PixelFlowClone.UI.Screens
 
             TMP_Text label = button.transform.Find("Label")?.GetComponent<TMP_Text>();
             if (label != null)
-            {
-                label.fontSize = 64f;
-                label.fontStyle = FontStyles.Bold;
-                label.color = Color.white;
                 label.transform.SetAsLastSibling();
+        }
+
+        private static void ApplyLevelButtonArtwork(
+            Button button,
+            Sprite artworkSprite,
+            bool unlocked)
+        {
+            if (button == null)
+                return;
+
+            Image image = button.GetComponent<Image>();
+            if (image == null)
+                return;
+
+            if (artworkSprite == null)
+            {
+                image.color = unlocked
+                    ? new Color(0.22f, 0.45f, 0.72f, 1f)
+                    : new Color(0.25f, 0.27f, 0.32f, 1f);
+                return;
             }
+
+            image.sprite = artworkSprite;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = true;
+            image.color = Color.white;
+            image.raycastTarget = true;
+            button.targetGraphic = image;
+
+            ColorBlock colors = button.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1f, 0.96f, 0.8f, 1f);
+            colors.pressedColor = new Color(0.86f, 0.72f, 0.38f, 1f);
+            colors.selectedColor = Color.white;
+            colors.disabledColor = new Color(0.42f, 0.42f, 0.42f, 0.9f);
+            button.colors = colors;
         }
 
         private static Button CreateMenuButton(
@@ -509,7 +619,8 @@ namespace PixelFlowClone.UI.Screens
             string label,
             Vector2 anchorMin,
             Vector2 anchorMax,
-            bool stretchToParent = true)
+            bool stretchToParent = true,
+            float labelFontSize = 36f)
         {
             Image image = CreateImage(parent, name, new Color(0.22f, 0.45f, 0.72f, 1f));
             if (stretchToParent)
@@ -535,7 +646,8 @@ namespace PixelFlowClone.UI.Screens
             colors.disabledColor = new Color(0.2f, 0.2f, 0.22f, 0.85f);
             button.colors = colors;
 
-            TMP_Text text = CreateLabel(image.transform, "Label", label, 36f, FontStyles.Bold);
+            TMP_Text text = CreateLabel(
+                image.transform, "Label", label, labelFontSize, FontStyles.Bold);
             StretchFull(text.rectTransform);
             text.raycastTarget = false;
 

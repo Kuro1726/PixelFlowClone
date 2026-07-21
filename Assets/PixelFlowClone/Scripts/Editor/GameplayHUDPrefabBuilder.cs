@@ -58,7 +58,8 @@ namespace PixelFlowClone.Editor
                         UpgradeVictoryPopupPresentation();
 
                     PausePopup pausePopup = prefab.GetComponentInChildren<PausePopup>(true);
-                    if (pausePopup == null || !pausePopup.UsesDirectHeaderEditing)
+                    if (pausePopup == null || !pausePopup.UsesDirectHeaderEditing ||
+                        !pausePopup.HasSettingsArtwork)
                         UpgradeOrEmbedPausePopup();
 
                     DefeatPopup defeatPopup = prefab.GetComponentInChildren<DefeatPopup>(true);
