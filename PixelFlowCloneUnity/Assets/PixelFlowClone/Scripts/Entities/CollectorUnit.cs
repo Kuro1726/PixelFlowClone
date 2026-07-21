@@ -18,6 +18,8 @@ namespace PixelFlowClone.Entities
     [RequireComponent(typeof(SpriteRenderer))]
     public class CollectorUnit : MonoBehaviour, ITappable
     {
+        private const string ShotShakeVisualName = "ShotShakeVisual";
+
         [SerializeField] private Rigidbody2D _rigidbody;
         [SerializeField] private SpriteRenderer _spriteRenderer;
         [SerializeField] private TMP_Text _capacityLabel;
@@ -29,6 +31,9 @@ namespace PixelFlowClone.Entities
         [SerializeField] private float _spriteNoseAngleAtRest = 90f;
         [Tooltip("Seconds used to blend the collector's rotation while turning on the conveyor.")]
         [SerializeField] [Min(0f)] private float _turnSmoothTime = 0.08f;
+        [SerializeField] [Min(0.01f)] private float _shotShakeDuration = 0.12f;
+        [SerializeField] [Min(0f)] private float _shotShakeAmplitude = 0.045f;
+        [SerializeField] [Min(1f)] private float _shotShakeOscillations = 3f;
 
         private readonly CollectorStateMachine _stateMachine = new();
         private Coroutine _exitRoutine;
@@ -42,6 +47,10 @@ namespace PixelFlowClone.Entities
         private Vector2 _consumeMoveDir = Vector2.right;
         private bool _isOnRoundedCorner;
         private float _turnAngularVelocity;
+        private Transform _shotShakeVisual;
+        private Vector3 _shotShakeRestLocalPosition;
+        private float _shotShakeElapsed;
+        private bool _isShotShakeActive;
         /// <summary>After first successful consume this lap, face inward until lap ends.</summary>
         private bool _faceInwardForRestOfLap;
 
@@ -168,6 +177,7 @@ namespace PixelFlowClone.Entities
         {
             if (_rigidbody == null) _rigidbody = GetComponent<Rigidbody2D>();
             if (_spriteRenderer == null) _spriteRenderer = GetComponent<SpriteRenderer>();
+            ResolveShotShakeVisual();
             GameplayFontUtility.Apply(_capacityLabel);
             if (_capacityLabel != null)
             {
@@ -178,6 +188,30 @@ namespace PixelFlowClone.Entities
                     _capacityLabel.transform.localPosition.z);
             }
             _defaultScale = transform.localScale;
+        }
+
+        private void LateUpdate()
+        {
+            if (!_isShotShakeActive || _shotShakeVisual == null)
+                return;
+
+            _shotShakeElapsed += Time.unscaledDeltaTime;
+            CollectorShotShakeFrame frame = CollectorShotShakeAnimation.Evaluate(
+                _shotShakeElapsed,
+                _shotShakeDuration,
+                _shotShakeAmplitude,
+                _shotShakeOscillations);
+
+            _shotShakeVisual.localPosition =
+                _shotShakeRestLocalPosition + (Vector3)frame.LocalOffset;
+
+            if (frame.IsComplete)
+                ResetShotShake();
+        }
+
+        private void OnDisable()
+        {
+            ResetShotShake();
         }
 
         private void FixedUpdate()
@@ -282,6 +316,7 @@ namespace PixelFlowClone.Entities
 
         public void OnSpawnFromPool()
         {
+            ResetShotShake();
             CurrentMoveDirection = Vector2.right;
             _consumeMoveDir = Vector2.right;
             _isOnRoundedCorner = false;
@@ -600,6 +635,7 @@ namespace PixelFlowClone.Entities
             // First successful shot this lap: face inward for the rest of the lap.
             _faceInwardForRestOfLap = true;
             ApplyFacingFromMoveDirection(shootDirection);
+            PlayShotShake();
 
             if (!CapacityLogic.TryConsume(Capacity, Color, blockColor, out int newCapacity))
                 return;
@@ -807,6 +843,8 @@ namespace PixelFlowClone.Entities
 
         public void ResetFromPool()
         {
+            ResetShotShake();
+
             if (_exitRoutine != null)
             {
                 StopCoroutine(_exitRoutine);
@@ -846,6 +884,81 @@ namespace PixelFlowClone.Entities
         {
             if (_capacityLabel != null)
                 _capacityLabel.text = Capacity.ToString();
+        }
+
+        private void ResolveShotShakeVisual()
+        {
+            if (_spriteRenderer == null)
+                return;
+
+            if (_spriteRenderer.transform != transform)
+            {
+                CacheShotShakeVisual(_spriteRenderer.transform);
+                return;
+            }
+
+            Transform existingVisual = transform.Find(ShotShakeVisualName);
+            if (existingVisual != null &&
+                existingVisual.TryGetComponent(out SpriteRenderer existingRenderer))
+            {
+                _spriteRenderer.enabled = false;
+                _spriteRenderer = existingRenderer;
+                CacheShotShakeVisual(existingVisual);
+                return;
+            }
+
+            SpriteRenderer sourceRenderer = _spriteRenderer;
+            var visualObject = new GameObject(ShotShakeVisualName);
+            visualObject.layer = gameObject.layer;
+            visualObject.transform.SetParent(transform, false);
+
+            SpriteRenderer visualRenderer = visualObject.AddComponent<SpriteRenderer>();
+            CopySpriteRenderer(sourceRenderer, visualRenderer);
+            sourceRenderer.enabled = false;
+
+            _spriteRenderer = visualRenderer;
+            CacheShotShakeVisual(visualObject.transform);
+        }
+
+        private void CacheShotShakeVisual(Transform visual)
+        {
+            _shotShakeVisual = visual;
+            _shotShakeRestLocalPosition = visual.localPosition;
+        }
+
+        private static void CopySpriteRenderer(SpriteRenderer source, SpriteRenderer target)
+        {
+            target.sprite = source.sprite;
+            target.color = source.color;
+            target.sharedMaterial = source.sharedMaterial;
+            target.flipX = source.flipX;
+            target.flipY = source.flipY;
+            target.drawMode = source.drawMode;
+            target.size = source.size;
+            target.maskInteraction = source.maskInteraction;
+            target.spriteSortPoint = source.spriteSortPoint;
+            target.sortingLayerID = source.sortingLayerID;
+            target.sortingOrder = source.sortingOrder;
+            target.enabled = source.enabled;
+        }
+
+        private void PlayShotShake()
+        {
+            if (_shotShakeVisual == null || !isActiveAndEnabled)
+                return;
+
+            _shotShakeVisual.localPosition = _shotShakeRestLocalPosition;
+            _shotShakeElapsed = 0f;
+            _isShotShakeActive = true;
+        }
+
+        private void ResetShotShake()
+        {
+            _isShotShakeActive = false;
+            _shotShakeElapsed = 0f;
+
+            if (_shotShakeVisual != null)
+                _shotShakeVisual.localPosition = _shotShakeRestLocalPosition;
         }
     }
 }

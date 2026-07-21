@@ -352,3 +352,6 @@ MonoBehaviour:
   _rejectShakeAmplitude: 0.18
   _spriteNoseAngleAtRest: 90
   _turnSmoothTime: 0.08
+  _shotShakeDuration: 0.12
+  _shotShakeAmplitude: 0.045
+  _shotShakeOscillations: 3

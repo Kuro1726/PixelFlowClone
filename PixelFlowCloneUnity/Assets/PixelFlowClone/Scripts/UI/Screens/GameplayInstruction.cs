@@ -8,6 +8,7 @@ using PixelFlowClone.Queue;
 using PixelFlowClone.Utils;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace PixelFlowClone.UI.Screens
 {
@@ -33,7 +34,11 @@ namespace PixelFlowClone.UI.Screens
         [SerializeField] private int _tutorialLevelId = 1;
         [SerializeField] private Vector2 _fallbackFingerOffset = new(60f, -140f);
         [SerializeField, Min(0f)] private float _pressDistance = 18f;
-        [SerializeField, Min(0.1f)] private float _pressSpeed = 3.5f;
+        [Header("Tap Pulse")]
+        [SerializeField, Min(0.1f)] private float _pulseDurationSeconds =
+            TapPulseAnimation.DefaultDurationSeconds;
+        [SerializeField, Min(1f)] private float _pulseDiameter = 120f;
+        [SerializeField] private Color _pulseColor = Color.white;
 
         [Header("Step 1 - Waiting Collector")]
         [SerializeField, TextArea(2, 3)] private string _waitingText =
@@ -52,12 +57,17 @@ namespace PixelFlowClone.UI.Screens
         private CanvasGroup _canvasGroup;
         private Canvas _outerCanvas;
         private RectTransform _trackingRect;
+        private RectTransform _tapPulseRect;
+        private Image _tapPulseImage;
+        private Texture2D _tapPulseTexture;
+        private Sprite _tapPulseSprite;
         private readonly List<CollectorUnit> _waitingFronts = new();
         private CollectorUnit _target;
         private Coroutine _beginRoutine;
         private Coroutine _queueRoutine;
         private Step _step = Step.WaitingForLevel;
         private Vector2 _fingerBaseOffset;
+        private float _pulseStartedAt;
         private bool _interactionLocked;
 
         private static GameplayInstruction Active { get; set; }
@@ -104,6 +114,14 @@ namespace PixelFlowClone.UI.Screens
                 Active = null;
         }
 
+        private void OnDestroy()
+        {
+            DestroyGeneratedPulseAsset(_tapPulseSprite);
+            DestroyGeneratedPulseAsset(_tapPulseTexture);
+            _tapPulseSprite = null;
+            _tapPulseTexture = null;
+        }
+
         private void ResolveUi()
         {
             if (_targetAnchor == null)
@@ -134,6 +152,8 @@ namespace PixelFlowClone.UI.Screens
                 _fingerBaseOffset = savedOffset;
                 _fingerRect.anchoredPosition = _fingerBaseOffset;
             }
+
+            EnsureTapPulse();
 
             if (_instructionText == null)
                 return;
@@ -337,12 +357,14 @@ namespace PixelFlowClone.UI.Screens
                     _targetAnchor.localPosition.z);
             }
 
-            float pulse =
-                (Mathf.Sin(Time.unscaledTime * _pressSpeed * Mathf.PI * 2f) + 1f) * 0.5f;
+            TapPulseFrame pulse = TapPulseAnimation.Evaluate(
+                Time.unscaledTime - _pulseStartedAt,
+                _pulseDurationSeconds);
             _fingerRect.anchoredPosition =
-                GetCurrentFingerOffset() + Vector2.down * (_pressDistance * pulse);
-            float scale = Mathf.Lerp(1f, 0.92f, pulse);
+                GetCurrentFingerOffset() + Vector2.down * (_pressDistance * pulse.Press);
+            float scale = Mathf.Lerp(1f, 0.92f, pulse.Press);
             _fingerRect.localScale = new Vector3(scale, scale, 1f);
+            ApplyTapPulseFrame(pulse);
         }
 
         private void CompleteInstruction()
@@ -395,15 +417,152 @@ namespace PixelFlowClone.UI.Screens
 
         private void SetFingerVisible(bool visible)
         {
-            if (_fingerRect == null)
+            if (_fingerRect != null)
+            {
+                _fingerRect.gameObject.SetActive(visible);
+                if (!visible)
+                {
+                    _fingerRect.anchoredPosition = GetCurrentFingerOffset();
+                    _fingerRect.localScale = Vector3.one;
+                }
+            }
+
+            if (_tapPulseRect == null)
                 return;
 
-            _fingerRect.gameObject.SetActive(visible);
-            if (!visible)
+            _tapPulseRect.gameObject.SetActive(visible);
+            if (visible)
             {
-                _fingerRect.anchoredPosition = GetCurrentFingerOffset();
-                _fingerRect.localScale = Vector3.one;
+                _pulseStartedAt = Time.unscaledTime;
+                ApplyTapPulseFrame(TapPulseAnimation.Evaluate(0f, _pulseDurationSeconds));
             }
+            else
+            {
+                _tapPulseRect.localScale = Vector3.one;
+                SetTapPulseAlpha(0f);
+            }
+        }
+
+        private void EnsureTapPulse()
+        {
+            if (_targetAnchor == null)
+                return;
+
+            Transform existing = _targetAnchor.Find("TapPulse");
+            if (existing != null && existing.TryGetComponent(out Image existingImage))
+            {
+                _tapPulseImage = existingImage;
+                _tapPulseRect = existingImage.rectTransform;
+            }
+            else
+            {
+                var pulseObject = new GameObject(
+                    "TapPulse",
+                    typeof(RectTransform),
+                    typeof(CanvasRenderer),
+                    typeof(Image));
+                pulseObject.layer = _targetAnchor.gameObject.layer;
+                pulseObject.transform.SetParent(_targetAnchor, false);
+                _tapPulseImage = pulseObject.GetComponent<Image>();
+                _tapPulseRect = _tapPulseImage.rectTransform;
+            }
+
+            _tapPulseRect.anchorMin = new Vector2(0.5f, 0.5f);
+            _tapPulseRect.anchorMax = new Vector2(0.5f, 0.5f);
+            _tapPulseRect.pivot = new Vector2(0.5f, 0.5f);
+            _tapPulseRect.anchoredPosition = Vector2.zero;
+            _tapPulseRect.sizeDelta = Vector2.one * _pulseDiameter;
+            _tapPulseRect.SetAsFirstSibling();
+
+            _tapPulseImage.raycastTarget = false;
+            _tapPulseImage.preserveAspect = true;
+            if (_tapPulseImage.sprite == null)
+            {
+                _tapPulseTexture = CreateCircleTexture();
+                _tapPulseSprite = Sprite.Create(
+                    _tapPulseTexture,
+                    new Rect(0f, 0f, _tapPulseTexture.width, _tapPulseTexture.height),
+                    new Vector2(0.5f, 0.5f),
+                    _tapPulseTexture.width);
+                _tapPulseSprite.name = "GeneratedTutorialTapPulse";
+                _tapPulseSprite.hideFlags = HideFlags.HideAndDontSave;
+                _tapPulseImage.sprite = _tapPulseSprite;
+            }
+
+            SetTapPulseAlpha(0f);
+        }
+
+        private Texture2D CreateCircleTexture()
+        {
+            const int textureSize = 64;
+            const float radius = 0.5f;
+            const float edgeSoftnessPixels = 1.5f;
+
+            var texture = new Texture2D(
+                textureSize,
+                textureSize,
+                TextureFormat.RGBA32,
+                false,
+                true)
+            {
+                name = "GeneratedTutorialTapPulse",
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            var pixels = new Color32[textureSize * textureSize];
+            float edgeWidth = edgeSoftnessPixels / textureSize;
+
+            for (int y = 0; y < textureSize; y++)
+            {
+                for (int x = 0; x < textureSize; x++)
+                {
+                    float normalizedX = (x + 0.5f) / textureSize - 0.5f;
+                    float normalizedY = (y + 0.5f) / textureSize - 0.5f;
+                    float distance = Mathf.Sqrt(
+                        normalizedX * normalizedX + normalizedY * normalizedY);
+                    byte alpha = (byte)Mathf.RoundToInt(
+                        Mathf.Clamp01((radius - distance) / edgeWidth) * 255f);
+                    pixels[y * textureSize + x] = new Color32(255, 255, 255, alpha);
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+            return texture;
+        }
+
+        private void ApplyTapPulseFrame(TapPulseFrame frame)
+        {
+            if (_tapPulseRect == null || _tapPulseImage == null)
+                return;
+
+            _tapPulseRect.localScale = new Vector3(
+                frame.CircleScale,
+                frame.CircleScale,
+                1f);
+            SetTapPulseAlpha(frame.CircleAlpha);
+        }
+
+        private void SetTapPulseAlpha(float alpha)
+        {
+            if (_tapPulseImage == null)
+                return;
+
+            Color color = _pulseColor;
+            color.a *= alpha;
+            _tapPulseImage.color = color;
+        }
+
+        private static void DestroyGeneratedPulseAsset(Object asset)
+        {
+            if (asset == null)
+                return;
+
+            if (Application.isPlaying)
+                Destroy(asset);
+            else
+                DestroyImmediate(asset);
         }
 
         private Vector2 GetCurrentFingerOffset()

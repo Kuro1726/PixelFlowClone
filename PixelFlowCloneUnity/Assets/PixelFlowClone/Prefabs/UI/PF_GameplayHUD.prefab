@@ -7355,7 +7355,9 @@ MonoBehaviour:
   _tutorialLevelId: 1
   _fallbackFingerOffset: {x: 60, y: -140}
   _pressDistance: 18
-  _pressSpeed: 3.5
+  _pulseDurationSeconds: 1.5
+  _pulseDiameter: 120
+  _pulseColor: {r: 1, g: 1, b: 1, a: 1}
   _waitingText: Tap shooter to place into the conveyor.
   _waitingFingerAdjustment: {x: 0, y: 0}
   _lapText: ' Wait for shooter to travel.'
