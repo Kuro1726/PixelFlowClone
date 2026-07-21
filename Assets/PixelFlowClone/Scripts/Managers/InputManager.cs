@@ -113,6 +113,9 @@ namespace PixelFlowClone.Managers
             if (tappable == null)
                 return false;
 
+            if (!PixelFlowClone.UI.Screens.GameplayInstruction.AllowsGameplayTap(tappable))
+                return false;
+
             if (!_tapCooldown.TryAccept())
                 return false;
 

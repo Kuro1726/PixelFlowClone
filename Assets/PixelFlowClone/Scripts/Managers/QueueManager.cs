@@ -116,6 +116,7 @@ namespace PixelFlowClone.Managers
             }
 
             Debug.Log($"[QueueManager] Waiting → Conveyor OK: color={popped.Color} capacity={popped.Capacity} waitingLeft={_waiting.Count}");
+            GameEvents.RaiseCollectorDispatchedFromWaiting(popped);
             return true;
         }
 
@@ -230,6 +231,7 @@ namespace PixelFlowClone.Managers
             Debug.Log(
                 $"[QueueManager] Queue → Conveyor OK: slot={slotIndex}, " +
                 $"color={removed.Color}, capacity={removed.Capacity}");
+            GameEvents.RaiseCollectorDispatchedFromQueue(removed);
             return true;
         }
 

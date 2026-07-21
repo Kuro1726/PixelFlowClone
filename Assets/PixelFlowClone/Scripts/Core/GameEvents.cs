@@ -13,6 +13,8 @@ namespace PixelFlowClone.Core
         public static event Action<int, int> OnConveyorCountChanged;
         public static event Action<int, int> OnQueueCountChanged;
         public static event Action<CollectorUnit> OnConveyorDispatchRejected;
+        public static event Action<CollectorUnit> OnCollectorDispatchedFromWaiting;
+        public static event Action<CollectorUnit> OnCollectorDispatchedFromQueue;
         /// <summary>Fired after a block is consumed. Args: world position, block color.</summary>
         public static event Action<Vector3, ColorId> OnBlockConsumed;
         /// <summary>Cosmetic shot from a collector to a consumed block. Args: origin, target.</summary>
@@ -31,6 +33,12 @@ namespace PixelFlowClone.Core
 
         public static void RaiseConveyorDispatchRejected(CollectorUnit unit)
             => OnConveyorDispatchRejected?.Invoke(unit);
+
+        public static void RaiseCollectorDispatchedFromWaiting(CollectorUnit unit)
+            => OnCollectorDispatchedFromWaiting?.Invoke(unit);
+
+        public static void RaiseCollectorDispatchedFromQueue(CollectorUnit unit)
+            => OnCollectorDispatchedFromQueue?.Invoke(unit);
 
         public static void RaiseBlockConsumed(Vector3 worldPosition, ColorId color)
             => OnBlockConsumed?.Invoke(worldPosition, color);
@@ -61,6 +69,8 @@ namespace PixelFlowClone.Core
             OnConveyorCountChanged = null;
             OnQueueCountChanged = null;
             OnConveyorDispatchRejected = null;
+            OnCollectorDispatchedFromWaiting = null;
+            OnCollectorDispatchedFromQueue = null;
             OnBlockConsumed = null;
             OnCollectorShot = null;
             OnCollectorExited = null;
