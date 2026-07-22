@@ -35,6 +35,7 @@ namespace PixelFlowClone.Managers
         private readonly Queue<AudioSource> _available = new();
         private readonly List<AudioSource> _all = new();
         private readonly Dictionary<SfxId, AudioClip> _resolved = new();
+        private readonly Dictionary<AudioSource, PooledSourceState> _sourceStates = new();
 
         protected override void OnSingletonAwake()
         {
@@ -101,7 +102,7 @@ namespace PixelFlowClone.Managers
             source.pitch = 1f;
             source.volume = _sfxVolume;
             source.PlayOneShot(clip, _sfxVolume);
-            StartCoroutine(ReturnWhenDone(source, clip.length / Mathf.Max(0.01f, source.pitch)));
+            ScheduleReturn(source, clip.length / Mathf.Max(0.01f, source.pitch));
         }
 
         private void HandleBlockConsumed(Vector3 worldPosition, ColorId color) => PlayConsume();
@@ -161,6 +162,7 @@ namespace PixelFlowClone.Managers
                 source.spatialBlend = 0f;
                 source.loop = false;
                 _all.Add(source);
+                _sourceStates[source] = new PooledSourceState(source);
                 _available.Enqueue(source);
             }
         }
@@ -170,25 +172,78 @@ namespace PixelFlowClone.Managers
             EnsureSourcePool();
 
             if (_available.Count > 0)
-                return _available.Dequeue();
+            {
+                AudioSource source = _available.Dequeue();
+                if (_sourceStates.TryGetValue(source, out PooledSourceState rentedState))
+                    rentedState.IsQueued = false;
+                return source;
+            }
 
             // Steal the first source if all busy.
             AudioSource busy = _all[0];
             busy.Stop();
+            if (_sourceStates.TryGetValue(busy, out PooledSourceState busyState))
+                busyState.IsScheduled = false;
             return busy;
         }
 
-        private System.Collections.IEnumerator ReturnWhenDone(AudioSource source, float seconds)
+        private void Update()
         {
-            yield return new WaitForSecondsRealtime(Mathf.Max(0.05f, seconds + 0.02f));
-            if (source == null)
-                yield break;
+            float now = Time.unscaledTime;
+            for (int i = 0; i < _all.Count; i++)
+            {
+                AudioSource source = _all[i];
+                if (source == null || !_sourceStates.TryGetValue(source, out PooledSourceState sourceState))
+                    continue;
 
-            source.Stop();
-            if (!_available.Contains(source))
-                _available.Enqueue(source);
+                if (!sourceState.IsScheduled || now < sourceState.ReleaseAt)
+                    continue;
+
+                ReturnSource(sourceState);
+            }
         }
 
+        private void ScheduleReturn(AudioSource source, float seconds)
+        {
+            if (source == null)
+                return;
+
+            if (!_sourceStates.TryGetValue(source, out PooledSourceState sourceState))
+            {
+                sourceState = new PooledSourceState(source);
+                _sourceStates[source] = sourceState;
+            }
+
+            sourceState.ReleaseAt = Time.unscaledTime + Mathf.Max(0.05f, seconds + 0.02f);
+            sourceState.IsScheduled = true;
+        }
+
+        private void ReturnSource(PooledSourceState sourceState)
+        {
+            if (sourceState == null || sourceState.Source == null)
+                return;
+
+            sourceState.Source.Stop();
+            sourceState.IsScheduled = false;
+            if (!sourceState.IsQueued)
+            {
+                sourceState.IsQueued = true;
+                _available.Enqueue(sourceState.Source);
+            }
+        }
+        private sealed class PooledSourceState
+        {
+            public PooledSourceState(AudioSource source)
+            {
+                Source = source;
+                IsQueued = true;
+            }
+
+            public AudioSource Source { get; }
+            public float ReleaseAt;
+            public bool IsScheduled;
+            public bool IsQueued;
+        }
         private static AudioClip SynthesizeTone(
             string name,
             float frequencyHz,

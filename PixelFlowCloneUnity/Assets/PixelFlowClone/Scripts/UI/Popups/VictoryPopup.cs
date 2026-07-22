@@ -34,6 +34,8 @@ namespace PixelFlowClone.UI.Popups
         private const int CurrentPresentationVersion = 1;
         private const float DimAlpha = 0.72f;
         private Coroutine _showAnimation;
+        private readonly List<CelebrationEffect> _effectPool = new List<CelebrationEffect>(24);
+        private readonly List<CelebrationEffect> _activeEffects = new List<CelebrationEffect>(24);
         private Vector2 _contentRestPosition;
         private static Sprite _coinSprite;
         private static Sprite _sparkleSprite;
@@ -55,6 +57,11 @@ namespace PixelFlowClone.UI.Popups
         private void OnEnable()
         {
             WireButtons();
+        }
+
+        private void Update()
+        {
+            TickCelebrationEffects(Time.unscaledDeltaTime);
         }
 
         private void OnDisable()
@@ -294,6 +301,7 @@ namespace PixelFlowClone.UI.Popups
             if (_dimImage != null)
                 _animatedContent.SetSiblingIndex(Mathf.Min(1, transform.childCount - 1));
             _effectsRoot.SetAsLastSibling();
+            EnsureCelebrationEffectPool();
             _contentRestPosition = _animatedContent.anchoredPosition;
         }
 
@@ -364,7 +372,7 @@ namespace PixelFlowClone.UI.Popups
         private IEnumerator PlayShowAnimation()
         {
             Canvas.ForceUpdateCanvases();
-            StartCoroutine(PlayCelebrationEffects());
+            ScheduleCelebrationEffects();
 
             float elapsed = 0f;
             const float popDuration = 0.34f;
@@ -398,10 +406,12 @@ namespace PixelFlowClone.UI.Popups
             _showAnimation = null;
         }
 
-        private IEnumerator PlayCelebrationEffects()
+        private void ScheduleCelebrationEffects()
         {
             if (_effectsRoot == null)
-                yield break;
+                return;
+
+            EnsureCelebrationEffectPool();
 
             Rect rect = _effectsRoot.rect;
             float width = rect.width > 1f ? rect.width : 1080f;
@@ -412,92 +422,171 @@ namespace PixelFlowClone.UI.Popups
                 SpawnFlyingCoin(width, height, i * 0.025f);
                 if (i < 10)
                     SpawnSparkle(width, height, i * 0.045f);
-                yield return new WaitForSecondsRealtime(0.025f);
             }
         }
 
         private void SpawnFlyingCoin(float width, float height, float delay)
         {
-            Image coin = CreateEffectImage("FlyingCoin", GetCoinSprite());
-            float size = UnityEngine.Random.Range(42f, 70f);
-            coin.rectTransform.sizeDelta = new Vector2(size, size);
+            CelebrationEffect effect = RentCelebrationEffect(GetCoinSprite(), "FlyingCoin");
+            if (effect == null)
+                return;
 
-            Vector2 start = new Vector2(
+            float size = UnityEngine.Random.Range(42f, 70f);
+            effect.Rect.sizeDelta = new Vector2(size, size);
+            effect.Start = new Vector2(
                 UnityEngine.Random.Range(-0.12f, 0.12f) * width,
                 UnityEngine.Random.Range(0.02f, 0.12f) * height);
-            Vector2 end = new Vector2(
+            effect.End = new Vector2(
                 UnityEngine.Random.Range(-0.44f, 0.44f) * width,
                 UnityEngine.Random.Range(0.34f, 0.52f) * height);
-            coin.rectTransform.anchoredPosition = start;
-            StartCoroutine(AnimateCoin(coin, start, end, delay));
-        }
-
-        private IEnumerator AnimateCoin(Image coin, Vector2 start, Vector2 end, float delay)
-        {
-            if (delay > 0f)
-                yield return new WaitForSecondsRealtime(delay);
-
-            float elapsed = 0f;
-            float duration = UnityEngine.Random.Range(0.75f, 1.05f);
-            float arcHeight = UnityEngine.Random.Range(90f, 180f);
-            CanvasGroup group = coin.gameObject.AddComponent<CanvasGroup>();
-
-            while (coin != null && elapsed < duration)
-            {
-                elapsed += Time.unscaledDeltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
-                Vector2 position = Vector2.Lerp(start, end, EaseOutCubic(t));
-                position.y += Mathf.Sin(t * Mathf.PI) * arcHeight;
-                coin.rectTransform.anchoredPosition = position;
-                coin.rectTransform.localScale = new Vector3(
-                    Mathf.Lerp(0.18f, 1f, Mathf.Abs(Mathf.Cos(t * Mathf.PI * 5f))),
-                    1f,
-                    1f);
-                coin.rectTransform.Rotate(0f, 0f, Time.unscaledDeltaTime * 150f);
-                group.alpha = 1f - Mathf.Clamp01((t - 0.72f) / 0.28f);
-                yield return null;
-            }
-
-            if (coin != null)
-                Destroy(coin.gameObject);
+            effect.Rect.anchoredPosition = effect.Start;
+            effect.Rect.localScale = Vector3.one;
+            effect.Rect.localRotation = Quaternion.identity;
+            effect.Image.color = Color.white;
+            effect.Group.alpha = 0f;
+            effect.Delay = delay;
+            effect.Elapsed = 0f;
+            effect.Duration = UnityEngine.Random.Range(0.75f, 1.05f);
+            effect.ArcHeight = UnityEngine.Random.Range(90f, 180f);
+            effect.IsCoin = true;
+            ActivateCelebrationEffect(effect);
         }
 
         private void SpawnSparkle(float width, float height, float delay)
         {
-            Image sparkle = CreateEffectImage("Sparkle", GetSparkleSprite());
+            CelebrationEffect effect = RentCelebrationEffect(GetSparkleSprite(), "Sparkle");
+            if (effect == null)
+                return;
+
             float size = UnityEngine.Random.Range(30f, 72f);
-            sparkle.rectTransform.sizeDelta = new Vector2(size, size);
-            sparkle.rectTransform.anchoredPosition = new Vector2(
+            effect.Rect.sizeDelta = new Vector2(size, size);
+            effect.Rect.anchoredPosition = new Vector2(
                 UnityEngine.Random.Range(-0.42f, 0.42f) * width,
                 UnityEngine.Random.Range(0.12f, 0.44f) * height);
-            sparkle.color = UnityEngine.Random.value > 0.45f
+            effect.Rect.localScale = Vector3.zero;
+            effect.Rect.localRotation = Quaternion.identity;
+            effect.Image.color = UnityEngine.Random.value > 0.45f
                 ? new Color(1f, 0.9f, 0.25f, 1f)
                 : Color.white;
-            StartCoroutine(AnimateSparkle(sparkle, delay));
+            effect.Group.alpha = 0f;
+            effect.Delay = delay;
+            effect.Elapsed = 0f;
+            effect.Duration = 0.58f;
+            effect.IsCoin = false;
+            ActivateCelebrationEffect(effect);
+        }
+        private void EnsureCelebrationEffectPool()
+        {
+            if (_effectsRoot == null)
+                return;
+
+            const int targetCount = 28;
+            while (_effectPool.Count < targetCount)
+            {
+                Image image = CreateEffectImage("CelebrationEffect", null);
+                CanvasGroup group = image.GetComponent<CanvasGroup>();
+                if (group == null)
+                    group = image.gameObject.AddComponent<CanvasGroup>();
+
+                CelebrationEffect effect = new CelebrationEffect(image, group);
+                ReleaseCelebrationEffect(effect);
+                _effectPool.Add(effect);
+            }
         }
 
-        private IEnumerator AnimateSparkle(Image sparkle, float delay)
+        private CelebrationEffect RentCelebrationEffect(Sprite sprite, string objectName)
         {
-            if (delay > 0f)
-                yield return new WaitForSecondsRealtime(delay);
+            EnsureCelebrationEffectPool();
 
-            CanvasGroup group = sparkle.gameObject.AddComponent<CanvasGroup>();
-            float elapsed = 0f;
-            const float duration = 0.58f;
-            while (sparkle != null && elapsed < duration)
+            for (int i = 0; i < _effectPool.Count; i++)
             {
-                elapsed += Time.unscaledDeltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
-                float pulse = Mathf.Sin(t * Mathf.PI);
-                sparkle.rectTransform.localScale = Vector3.one * pulse;
-                sparkle.rectTransform.Rotate(0f, 0f, Time.unscaledDeltaTime * 110f);
-                group.alpha = pulse;
-                yield return null;
+                CelebrationEffect effect = _effectPool[i];
+                if (effect.IsActive)
+                    continue;
+
+                effect.Root.name = objectName;
+                effect.Image.sprite = sprite;
+                effect.Image.enabled = sprite != null;
+                effect.Root.SetActive(true);
+                return effect;
             }
 
-            if (sparkle != null)
-                Destroy(sparkle.gameObject);
+            Image image = CreateEffectImage(objectName, sprite);
+            CanvasGroup group = image.GetComponent<CanvasGroup>();
+            if (group == null)
+                group = image.gameObject.AddComponent<CanvasGroup>();
+
+            CelebrationEffect expanded = new CelebrationEffect(image, group);
+            _effectPool.Add(expanded);
+            return expanded;
         }
+
+        private void ActivateCelebrationEffect(CelebrationEffect effect)
+        {
+            if (effect == null || effect.IsActive)
+                return;
+
+            effect.IsActive = true;
+            _activeEffects.Add(effect);
+        }
+
+        private void TickCelebrationEffects(float deltaTime)
+        {
+            for (int i = _activeEffects.Count - 1; i >= 0; i--)
+            {
+                CelebrationEffect effect = _activeEffects[i];
+                if (effect == null || TickCelebrationEffect(effect, deltaTime))
+                {
+                    _activeEffects.RemoveAt(i);
+                    ReleaseCelebrationEffect(effect);
+                }
+            }
+        }
+
+        private static bool TickCelebrationEffect(CelebrationEffect effect, float deltaTime)
+        {
+            effect.Elapsed += deltaTime;
+            if (effect.Elapsed < effect.Delay)
+                return false;
+
+            float duration = Mathf.Max(0.01f, effect.Duration);
+            float t = Mathf.Clamp01((effect.Elapsed - effect.Delay) / duration);
+            if (effect.IsCoin)
+            {
+                Vector2 position = Vector2.Lerp(effect.Start, effect.End, EaseOutCubic(t));
+                position.y += Mathf.Sin(t * Mathf.PI) * effect.ArcHeight;
+                effect.Rect.anchoredPosition = position;
+                effect.Rect.localScale = new Vector3(
+                    Mathf.Lerp(0.18f, 1f, Mathf.Abs(Mathf.Cos(t * Mathf.PI * 5f))),
+                    1f,
+                    1f);
+                effect.Rect.Rotate(0f, 0f, deltaTime * 150f);
+                effect.Group.alpha = 1f - Mathf.Clamp01((t - 0.72f) / 0.28f);
+            }
+            else
+            {
+                float pulse = Mathf.Sin(t * Mathf.PI);
+                effect.Rect.localScale = Vector3.one * pulse;
+                effect.Rect.Rotate(0f, 0f, deltaTime * 110f);
+                effect.Group.alpha = pulse;
+            }
+
+            return t >= 1f;
+        }
+
+        private static void ReleaseCelebrationEffect(CelebrationEffect effect)
+        {
+            if (effect == null)
+                return;
+
+            effect.IsActive = false;
+            effect.Root.SetActive(false);
+            effect.Group.alpha = 0f;
+            effect.Rect.anchoredPosition = Vector2.zero;
+            effect.Rect.localScale = Vector3.one;
+            effect.Rect.localRotation = Quaternion.identity;
+        }
+
 
         private Image CreateEffectImage(string objectName, Sprite sprite)
         {
@@ -513,19 +602,10 @@ namespace PixelFlowClone.UI.Popups
 
         private void ClearCelebrationEffects()
         {
-            if (_effectsRoot == null)
-                return;
-
-            for (int i = _effectsRoot.childCount - 1; i >= 0; i--)
-            {
-                GameObject child = _effectsRoot.GetChild(i).gameObject;
-                if (Application.isPlaying)
-                    Destroy(child);
-                else
-                    DestroyImmediate(child);
-            }
+            _activeEffects.Clear();
+            for (int i = 0; i < _effectPool.Count; i++)
+                ReleaseCelebrationEffect(_effectPool[i]);
         }
-
         private void SetDimAlpha(float alpha)
         {
             if (_dimImage == null)
@@ -909,6 +989,30 @@ namespace PixelFlowClone.UI.Popups
             label.raycastTarget = false;
             return label;
         }
+        private sealed class CelebrationEffect
+        {
+            public CelebrationEffect(Image image, CanvasGroup group)
+            {
+                Image = image;
+                Group = group;
+                Rect = image.rectTransform;
+                Root = image.gameObject;
+            }
+
+            public GameObject Root { get; }
+            public Image Image { get; }
+            public CanvasGroup Group { get; }
+            public RectTransform Rect { get; }
+            public Vector2 Start { get; set; }
+            public Vector2 End { get; set; }
+            public float Delay { get; set; }
+            public float Elapsed { get; set; }
+            public float Duration { get; set; }
+            public float ArcHeight { get; set; }
+            public bool IsCoin { get; set; }
+            public bool IsActive { get; set; }
+        }
+
 
         private static void StretchFull(RectTransform rect)
         {

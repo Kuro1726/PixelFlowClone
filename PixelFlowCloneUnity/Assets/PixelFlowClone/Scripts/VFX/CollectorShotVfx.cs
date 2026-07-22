@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using PixelFlowClone.Core;
 using PixelFlowClone.Data;
@@ -33,7 +32,12 @@ namespace PixelFlowClone.VFX
             public GameObject Root;
             public SpriteRenderer Head;
             public TrailRenderer Trail;
-            public Coroutine Routine;
+            public Vector3 Origin;
+            public Vector3 Target;
+            public float Elapsed;
+            public float Duration;
+            public float TrailReleaseTime;
+            public bool IsFlying;
             public bool IsActive;
         }
 
@@ -86,46 +90,53 @@ namespace PixelFlowClone.VFX
             if (shot == null)
                 return;
 
-            if (shot.Routine != null)
-                StopCoroutine(shot.Routine);
+            shot.Origin = ForceGameplayPlane(origin);
+            shot.Target = ForceGameplayPlane(target);
+            shot.Elapsed = 0f;
+            shot.Duration = Mathf.Max(0.03f, _travelDuration);
+            shot.TrailReleaseTime = 0f;
+            shot.IsFlying = true;
+            shot.IsActive = true;
 
             shot.Root.SetActive(true);
-            shot.Root.transform.position = ForceGameplayPlane(origin);
+            shot.Root.transform.position = shot.Origin;
             shot.Head.enabled = true;
             shot.Trail.Clear();
             shot.Trail.emitting = true;
-            shot.IsActive = true;
-            shot.Routine = StartCoroutine(AnimateShot(shot, origin, target));
         }
 
-        private IEnumerator AnimateShot(Shot shot, Vector3 origin, Vector3 target)
+        private void Update()
         {
-            origin = ForceGameplayPlane(origin);
-            target = ForceGameplayPlane(target);
+            float deltaTime = Time.deltaTime;
+            for (int i = 0; i < _all.Count; i++)
+                TickShot(_all[i], deltaTime);
+        }
 
-            float elapsed = 0f;
-            float duration = Mathf.Max(0.03f, _travelDuration);
-            while (elapsed < duration)
+        private void TickShot(Shot shot, float deltaTime)
+        {
+            if (shot == null || !shot.IsActive)
+                return;
+
+            if (shot.IsFlying)
             {
-                elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
+                shot.Elapsed += deltaTime;
+                float t = Mathf.Clamp01(shot.Elapsed / shot.Duration);
                 float eased = 1f - Mathf.Pow(1f - t, 3f);
-                shot.Root.transform.position = Vector3.LerpUnclamped(origin, target, eased);
-                yield return null;
+                shot.Root.transform.position = Vector3.LerpUnclamped(shot.Origin, shot.Target, eased);
+
+                if (t < 1f)
+                    return;
+
+                shot.Root.transform.position = shot.Target;
+                shot.Head.enabled = false;
+                shot.Trail.emitting = false;
+                shot.IsFlying = false;
+                shot.TrailReleaseTime = Time.time + Mathf.Max(0.02f, _trailTime);
+                return;
             }
 
-            shot.Root.transform.position = target;
-            shot.Head.enabled = false;
-            shot.Trail.emitting = false;
-
-            float fadeTime = Mathf.Max(0.02f, _trailTime);
-            while (fadeTime > 0f)
-            {
-                fadeTime -= Time.deltaTime;
-                yield return null;
-            }
-
-            Release(shot);
+            if (Time.time >= shot.TrailReleaseTime)
+                Release(shot);
         }
 
         private Shot Rent()
@@ -145,11 +156,10 @@ namespace PixelFlowClone.VFX
             Shot fallback = _all.Count > 0 ? _all[0] : null;
             if (fallback != null)
             {
-                if (fallback.Routine != null)
-                    StopCoroutine(fallback.Routine);
                 fallback.Trail.emitting = false;
                 fallback.Trail.Clear();
                 fallback.IsActive = false;
+                fallback.IsFlying = false;
             }
 
             return fallback;
@@ -159,8 +169,6 @@ namespace PixelFlowClone.VFX
         {
             if (shot == null || !shot.IsActive)
                 return;
-
-            shot.Routine = null;
             shot.IsActive = false;
             shot.Trail.emitting = false;
             shot.Trail.Clear();
@@ -170,13 +178,11 @@ namespace PixelFlowClone.VFX
 
         private void StopAndReleaseAll()
         {
-            StopAllCoroutines();
             _available.Clear();
 
             for (int i = 0; i < _all.Count; i++)
             {
                 Shot shot = _all[i];
-                shot.Routine = null;
                 shot.IsActive = false;
                 shot.Trail.emitting = false;
                 shot.Trail.Clear();

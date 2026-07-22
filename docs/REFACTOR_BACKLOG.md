@@ -47,6 +47,13 @@ Các đoạn này tạo coroutine / yield instruction / object runtime theo sự
 9. Medium - Vi phạm rule logging không thương lượng.
 Không tìm thấy `GameDebug` implementation/use trong runtime, nhưng có nhiều raw `Debug.Log*`, ví dụ [CollectorUnit.cs](../PixelFlowCloneUnity/Assets/PixelFlowClone/Scripts/Gameplay/CollectorUnit.cs:81), [QueueManager.cs](../PixelFlowCloneUnity/Assets/PixelFlowClone/Scripts/Managers/QueueManager.cs:118), và nhiều file manager/UI khác. Theo rules trong `.claude/skills/uw-code-review/SKILL.md`, đây là issue vì log/interpolated string có thể còn trong release.
 
+
+**Refactor progress**
+
+- [x] Viec 1 - Tach collector flow va pha vong phu thuoc Queue/Conveyor. Da them `CollectorFlowCoordinator`, chuyen orchestration khoi `CollectorUnit`, va bo direct singleton calls trong `CollectorUnit`.
+- [x] Viec 2 - Don cac allocation/event spike theo consume/shot/audio.
+- [ ] Viec 3 - Tach UI builder khoi runtime presenter va chon mot owner cho HUD binding.
+
 **Top 3 việc nên refactor ngay**
 
 1. Tách collector flow và phá vòng phụ thuộc Queue/Conveyor.
