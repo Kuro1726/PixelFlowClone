@@ -1,9 +1,9 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using PixelFlowClone.Conveyor;
 using PixelFlowClone.Core;
 using PixelFlowClone.Data;
-using PixelFlowClone.Managers;
 using PixelFlowClone.Queue;
 using PixelFlowClone.Utils;
 using TMPro;
@@ -41,10 +41,10 @@ namespace PixelFlowClone.Entities
         private Vector3 _defaultScale = Vector3.one;
         private Vector3 _capacityLabelWorldOffset;
         private Vector3 _rejectShakeOrigin;
-        private float _nextConsumeTime;
-        private int _lastConsumeLane;
-        private bool _hasConsumeLane;
-        private Vector2 _consumeMoveDir = Vector2.right;
+        private float _exitDurationOverride = -1f;
+        private float _exitFlyDistanceOverride = -1f;
+        private bool _hasExitFlyDirectionOverride;
+        private Vector2 _exitFlyDirectionOverride = Vector2.zero;
         private bool _isOnRoundedCorner;
         private float _turnAngularVelocity;
         private Transform _shotShakeVisual;
@@ -53,6 +53,14 @@ namespace PixelFlowClone.Entities
         private bool _isShotShakeActive;
         /// <summary>After first successful consume this lap, face inward until lap ends.</summary>
         private bool _faceInwardForRestOfLap;
+        private Vector2 _inwardFacingDirection = Vector2.zero;
+
+        public static event Action<CollectorUnit> Tapped;
+        public static event Action<CollectorUnit, Vector2, Vector2> MovementAdvanced;
+        public static event Action<CollectorUnit> ConsumePreviewRequested;
+        public static event Action<CollectorUnit, float> ConsumeSuppressed;
+        public static event Action<CollectorUnit> LapCompleted;
+        public static event Action<CollectorUnit> ExitCompleted;
 
         public ColorId Color { get; private set; }
         public int Capacity { get; private set; }
@@ -62,6 +70,8 @@ namespace PixelFlowClone.Entities
 
         /// <summary>Cardinal gameplay direction used for lane selection and perpendicular raycasts.</summary>
         public Vector2 CurrentMoveDirection { get; private set; } = Vector2.right;
+
+        public bool IsOnRoundedCorner => _isOnRoundedCorner;
 
         public bool TrySetState(CollectorState target) => _stateMachine.TryTransition(target);
 
@@ -74,55 +84,12 @@ namespace PixelFlowClone.Entities
 
         /// <summary>
         /// Player tap. Waiting stack → direct to conveyor; queue slot → manual re-dispatch.
-        /// Front-of-stack / slot ownership are enforced by QueueManager (P2-05+).
+        /// Front-of-stack / slot ownership are enforced by the collector flow coordinator (P2-05+).
         /// </summary>
         public void OnTap()
         {
             Debug.Log($"[CollectorUnit] OnTap color={Color} capacity={Capacity} state={State}");
-
-            switch (State)
-            {
-                case CollectorState.InWaitingStack:
-                    if (QueueManager.HasInstance)
-                    {
-                        bool ok = QueueManager.Instance.TryDispatchFromWaiting(this);
-                        Debug.Log($"[CollectorUnit] Waiting dispatch via QueueManager → {(ok ? "OK" : "REJECTED")}");
-                    }
-                    else
-                        TryDispatchToConveyorFromTap();
-                    break;
-                case CollectorState.InQueueSlot:
-                    if (QueueManager.HasInstance)
-                    {
-                        bool ok = QueueManager.Instance.TryDispatchFromQueue(this);
-                        Debug.Log($"[CollectorUnit] Queue dispatch via QueueManager → {(ok ? "OK" : "REJECTED")}");
-                    }
-                    else
-                        TryDispatchToConveyorFromTap();
-                    break;
-                case CollectorState.OnConveyor:
-                case CollectorState.Exiting:
-                case CollectorState.Pooled:
-                default:
-                    Debug.Log($"[CollectorUnit] OnTap ignored in state {State}");
-                    break;
-            }
-        }
-
-        private void TryDispatchToConveyorFromTap()
-        {
-            if (!ConveyorPathManager.HasInstance)
-            {
-                Debug.LogWarning("[CollectorUnit] OnTap: ConveyorPathManager missing.");
-                return;
-            }
-
-            bool ok = ConveyorPathManager.Instance.DispatchToConveyor(this);
-            if (!ok)
-            {
-                Debug.Log($"[CollectorUnit] OnTap rejected ({State}, conveyor full or already active).");
-                PlayRejectShake();
-            }
+            Tapped?.Invoke(this);
         }
 
         /// <summary>
@@ -216,35 +183,8 @@ namespace PixelFlowClone.Entities
 
         private void FixedUpdate()
         {
-            if (State != CollectorState.OnConveyor)
-                return;
-
-            DrawPerpendicularRayPreview();
-            // Consume runs after movement in ConveyorPathManager so high-speed sweeps
-            // sample along the path traveled this physics step.
-        }
-
-        /// <summary>
-        /// Keeps Debug.DrawRay visible every FixedUpdate while on the conveyor (P1-31).
-        /// </summary>
-        private void DrawPerpendicularRayPreview()
-        {
-            if (_isOnRoundedCorner)
-                return;
-
-            if (!ConveyorPathManager.HasInstance)
-                return;
-
-            GameConfigSO config = ConveyorPathManager.Instance.Config;
-            if (config == null)
-                return;
-
-            Vector2 origin = _rigidbody != null ? _rigidbody.position : (Vector2)transform.position;
-            Vector2 gridCenter = GridManager.HasInstance
-                ? GridManager.Instance.GridCenterWorld
-                : Vector2.zero;
-
-            PerpendicularRaycastSensor.DrawDebugRayPreview(origin, CurrentMoveDirection, config, gridCenter);
+            if (State == CollectorState.OnConveyor)
+                ConsumePreviewRequested?.Invoke(this);
         }
 
         /// <summary>
@@ -257,9 +197,6 @@ namespace PixelFlowClone.Entities
 
             if (_spriteRenderer != null) _spriteRenderer.color = ColorPalette.ToColor(color);
             RefreshCapacityLabel();
-            _nextConsumeTime = 0f;
-            _hasConsumeLane = false;
-            _consumeMoveDir = Vector2.right;
         }
 
         /// <summary>
@@ -286,7 +223,6 @@ namespace PixelFlowClone.Entities
                 ? direction.normalized
                 : Vector2.right;
             CurrentMoveDirection = SnapToCardinal(tangent);
-            _consumeMoveDir = CurrentMoveDirection;
             _isOnRoundedCorner = IsDiagonal(tangent);
         }
 
@@ -296,35 +232,31 @@ namespace PixelFlowClone.Entities
         public void PrepareConveyorFacing()
         {
             _faceInwardForRestOfLap = false;
+            _inwardFacingDirection = Vector2.zero;
             _isOnRoundedCorner = false;
             ApplyFacingFromMoveDirection(Vector2.right, true);
         }
 
         public void SuppressConsumeFor(float seconds)
         {
-            _nextConsumeTime = Time.time + Mathf.Max(0f, seconds);
+            ConsumeSuppressed?.Invoke(this, seconds);
         }
 
         public void SetCapacity(int capacity)
         {
             Capacity = Mathf.Max(0, capacity);
             RefreshCapacityLabel();
-
-            if (Capacity == 0 && State == CollectorState.OnConveyor)
-                BeginExit();
         }
 
         public void OnSpawnFromPool()
         {
             ResetShotShake();
+            ResetExitOverrides();
             CurrentMoveDirection = Vector2.right;
-            _consumeMoveDir = Vector2.right;
             _isOnRoundedCorner = false;
             transform.localScale = _defaultScale;
             ResetFacing();
             _exitRoutine = null;
-            _nextConsumeTime = 0f;
-            _hasConsumeLane = false;
         }
 
         /// <summary>
@@ -377,7 +309,7 @@ namespace PixelFlowClone.Entities
             }
 
             Vector2 after = _rigidbody.position;
-            TryConsumeForLanesCrossed(before, after);
+            MovementAdvanced?.Invoke(this, before, after);
             return reachedWaypoint;
         }
 
@@ -390,11 +322,6 @@ namespace PixelFlowClone.Entities
             Vector2 cardinalDirection = SnapToCardinal(tangent);
             _isOnRoundedCorner = IsDiagonal(tangent);
 
-            // New belt edge: next lane on that edge may fire again.
-            if (Vector2.Dot(cardinalDirection, _consumeMoveDir) < 0.3f)
-                _hasConsumeLane = false;
-
-            _consumeMoveDir = cardinalDirection;
             CurrentMoveDirection = cardinalDirection;
             RefreshVisualFacing(tangent);
         }
@@ -423,7 +350,7 @@ namespace PixelFlowClone.Entities
         {
             if (_faceInwardForRestOfLap)
             {
-                Vector2 inward = GetCurrentShootDirection();
+                Vector2 inward = _inwardFacingDirection;
                 if (inward.sqrMagnitude > 0.0001f)
                 {
                     ApplyFacingFromMoveDirection(inward);
@@ -434,25 +361,20 @@ namespace PixelFlowClone.Entities
             ApplyFacingFromMoveDirection(pathTangent);
         }
 
-        private Vector2 GetCurrentShootDirection()
+        public void FaceInwardForRestOfLap(Vector2 inwardDirection)
         {
-            if (!ConveyorPathManager.HasInstance)
-                return Vector2.zero;
+            if (inwardDirection.sqrMagnitude < 0.0001f)
+                return;
 
-            GameConfigSO config = ConveyorPathManager.Instance.Config;
-            if (config == null || CurrentMoveDirection.sqrMagnitude < 0.0001f)
-                return Vector2.zero;
+            _faceInwardForRestOfLap = true;
+            _inwardFacingDirection = inwardDirection.normalized;
+            ApplyFacingFromMoveDirection(_inwardFacingDirection);
+        }
 
-            Vector2 origin = _rigidbody != null ? _rigidbody.position : (Vector2)transform.position;
-            Vector2 gridCenter = GridManager.HasInstance
-                ? GridManager.Instance.GridCenterWorld
-                : Vector2.zero;
-
-            return PerpendicularRaycastSensor.ComputePerpendicular(
-                CurrentMoveDirection.normalized,
-                config.RaycastSide,
-                origin,
-                gridCenter);
+        public void ResetLapFacing()
+        {
+            _faceInwardForRestOfLap = false;
+            _inwardFacingDirection = Vector2.zero;
         }
 
         /// <summary>
@@ -471,6 +393,7 @@ namespace PixelFlowClone.Entities
         private void ResetFacing()
         {
             _faceInwardForRestOfLap = false;
+            _inwardFacingDirection = Vector2.zero;
             // Waiting / queue / pool: authored art pose (nose up at rest).
             SetFacingAngle(0f, true);
         }
@@ -536,117 +459,6 @@ namespace PixelFlowClone.Entities
             waypointListIndex = (waypointListIndex + 1) % waypointCount;
         }
 
-        /// <summary>
-        /// Pixel Flow lane rule: each time the unit enters a new grid lane along the belt,
-        /// fire one max-distance inward ray. Nearest block same color → eat; else stop for that lane.
-        /// </summary>
-        private void TryConsumeForLanesCrossed(Vector2 from, Vector2 to)
-        {
-            if (State != CollectorState.OnConveyor || Capacity <= 0)
-                return;
-
-            // Rounded corners are movement-only. Consume resumes on the next axis-aligned edge,
-            // preventing diagonal rays / cross-lane hits while the visual follows the curve.
-            if (_isOnRoundedCorner)
-                return;
-
-            if (Time.time < _nextConsumeTime)
-                return;
-
-            if (!GridManager.HasInstance)
-                return;
-
-            bool movingVertically = Mathf.Abs(CurrentMoveDirection.y) >= Mathf.Abs(CurrentMoveDirection.x);
-            int laneFrom = GridManager.Instance.GetLaneIndex(from, movingVertically);
-            int laneTo = GridManager.Instance.GetLaneIndex(to, movingVertically);
-
-            if (laneFrom == laneTo)
-            {
-                if (!_hasConsumeLane || _lastConsumeLane != laneTo)
-                    FireLaneConsume(to, laneTo, movingVertically);
-                return;
-            }
-
-            int step = laneTo > laneFrom ? 1 : -1;
-            for (int lane = laneFrom + step; ; lane += step)
-            {
-                Vector2 origin = GridManager.Instance.GetLaneRayOrigin(to, lane, movingVertically);
-                // Keep the perpendicular axis from the real pose so the ray still aims inward.
-                if (movingVertically)
-                    origin.x = to.x;
-                else
-                    origin.y = to.y;
-
-                FireLaneConsume(origin, lane, movingVertically);
-
-                if (lane == laneTo || Capacity <= 0 || State != CollectorState.OnConveyor)
-                    break;
-            }
-        }
-
-        private void FireLaneConsume(Vector2 origin, int lane, bool movingVertically)
-        {
-            if (State != CollectorState.OnConveyor || Capacity <= 0)
-                return;
-
-            if (_hasConsumeLane && _lastConsumeLane == lane)
-                return;
-
-            _lastConsumeLane = lane;
-            _hasConsumeLane = true;
-
-            if (!ConveyorPathManager.HasInstance)
-                return;
-
-            GameConfigSO config = ConveyorPathManager.Instance.Config;
-            if (config == null)
-                return;
-
-            Vector2 gridCenter = GridManager.Instance.GridCenterWorld;
-            Vector2 shootDirection = PerpendicularRaycastSensor.ComputePerpendicular(
-                CurrentMoveDirection.normalized,
-                config.RaycastSide,
-                origin,
-                gridCenter);
-
-            // Nearest hit only: same color → eat; other color / empty → done for this lane.
-            bool canShoot = PerpendicularRaycastSensor.TryDetectConsumable(
-                    origin,
-                    CurrentMoveDirection,
-                    Color,
-                    config,
-                    gridCenter,
-                    out PixelBlock hitBlock);
-
-            if (!canShoot)
-                return;
-
-            ColorId blockColor = hitBlock.Color;
-            Vector3 shotOrigin = _rigidbody != null
-                ? (Vector3)_rigidbody.position
-                : transform.position;
-            Vector3 shotTarget = hitBlock.transform.position;
-            float visualDelay = Mathf.Max(0.03f, config.CollectorShotTravelDuration);
-            if (!GridManager.Instance.TryConsumeBlock(Color, hitBlock.GridPosition, visualDelay))
-                return;
-
-            GameEvents.RaiseCollectorShot(shotOrigin, shotTarget);
-
-            // First successful shot this lap: face inward for the rest of the lap.
-            _faceInwardForRestOfLap = true;
-            ApplyFacingFromMoveDirection(shootDirection);
-            PlayShotShake();
-
-            if (!CapacityLogic.TryConsume(Capacity, Color, blockColor, out int newCapacity))
-                return;
-
-            Capacity = newCapacity;
-            RefreshCapacityLabel();
-
-            if (Capacity == 0)
-                BeginExit();
-        }
-
         /// <summary>Legacy no-op; lane consume runs inside <see cref="TickMovement"/>.</summary>
         public void TryConsumeAlongMovement(Vector2 from, Vector2 to)
         {
@@ -655,7 +467,7 @@ namespace PixelFlowClone.Entities
         public void TryConsumeBlocks()
         {
             Vector2 pos = _rigidbody != null ? _rigidbody.position : (Vector2)transform.position;
-            TryConsumeForLanesCrossed(pos, pos);
+            MovementAdvanced?.Invoke(this, pos, pos);
         }
 
         public void TryConsumeOnce()
@@ -669,27 +481,8 @@ namespace PixelFlowClone.Entities
         /// </summary>
         public void OnLapComplete()
         {
-            _faceInwardForRestOfLap = false;
-
-            if (Capacity <= 0)
-            {
-                BeginExit();
-                return;
-            }
-
-            if (ConveyorPathManager.HasInstance &&
-                ConveyorPathManager.Instance.IsEndgameRushActive() &&
-                ConveyorPathManager.Instance.Config != null &&
-                ConveyorPathManager.Instance.Config.EndgameSkipQueueOnLap)
-            {
-                Debug.Log(
-                    $"[CollectorUnit] Endgame rush — stay on conveyor " +
-                    $"(color={Color}, capacity={Capacity}, alive={ConveyorPathManager.CountAliveCollectors()}).");
-                return;
-            }
-
-            if (QueueManager.HasInstance)
-                QueueManager.Instance.TryEnqueueFromLap(this);
+            ResetLapFacing();
+            LapCompleted?.Invoke(this);
         }
 
         /// <summary>
@@ -714,9 +507,6 @@ namespace PixelFlowClone.Entities
                 return false;
             }
 
-            if (ConveyorPathManager.HasInstance)
-                ConveyorPathManager.Instance.UnregisterUnit(this);
-
             Capacity = 0;
             RefreshCapacityLabel();
 
@@ -728,7 +518,7 @@ namespace PixelFlowClone.Entities
         }
 
         /// <summary>
-        /// P3-18: scale-down + fly-off tween before <see cref="PoolManager.ReleaseCollector"/>.
+        /// P3-18: scale-down + fly-off tween before release intent.
         /// </summary>
         private IEnumerator ExitSequence()
         {
@@ -781,41 +571,55 @@ namespace PixelFlowClone.Entities
 
         private void ResolveExitTunables(out float duration, out float flyDistance)
         {
-            duration = Mathf.Max(0.05f, _exitDuration);
-            flyDistance = Mathf.Max(0f, _exitFlyDistance);
-
-            GameConfigSO config = null;
-            if (ConveyorPathManager.HasInstance)
-                config = ConveyorPathManager.Instance.Config;
-
-            if (config == null)
-                return;
-
-            if (config.CollectorExitDuration > 0.01f)
-                duration = config.CollectorExitDuration;
-            if (config.CollectorExitFlyDistance >= 0f)
-                flyDistance = config.CollectorExitFlyDistance;
+            duration = _exitDurationOverride > 0.01f
+                ? _exitDurationOverride
+                : Mathf.Max(0.05f, _exitDuration);
+            flyDistance = _exitFlyDistanceOverride >= 0f
+                ? _exitFlyDistanceOverride
+                : Mathf.Max(0f, _exitFlyDistance);
         }
 
         private Vector3 ResolveExitFlyDirection()
         {
+            if (_hasExitFlyDirectionOverride)
+                return new Vector3(_exitFlyDirectionOverride.x, _exitFlyDirectionOverride.y, 0f);
+
             Vector2 outward = CurrentMoveDirection;
             if (outward.sqrMagnitude < 0.0001f)
                 outward = Vector2.up;
             else
                 outward.Normalize();
 
-            // Prefer flying away from the playfield center when available.
-            if (GridManager.HasInstance)
-            {
-                Vector2 fromCenter = (Vector2)transform.position - GridManager.Instance.GridCenterWorld;
-                if (fromCenter.sqrMagnitude > 0.0001f)
-                    outward = fromCenter.normalized;
-            }
-
             return new Vector3(outward.x, outward.y, 0f);
         }
 
+        public void ApplyExitTunables(GameConfigSO config)
+        {
+            _exitDurationOverride = config != null && config.CollectorExitDuration > 0.01f
+                ? config.CollectorExitDuration
+                : -1f;
+            _exitFlyDistanceOverride = config != null && config.CollectorExitFlyDistance >= 0f
+                ? config.CollectorExitFlyDistance
+                : -1f;
+        }
+
+        public void SetExitFlyDirectionFrom(Vector2 playfieldCenter)
+        {
+            Vector2 fromCenter = (Vector2)transform.position - playfieldCenter;
+            if (fromCenter.sqrMagnitude <= 0.0001f)
+                return;
+
+            _exitFlyDirectionOverride = fromCenter.normalized;
+            _hasExitFlyDirectionOverride = true;
+        }
+
+        private void ResetExitOverrides()
+        {
+            _exitDurationOverride = -1f;
+            _exitFlyDistanceOverride = -1f;
+            _hasExitFlyDirectionOverride = false;
+            _exitFlyDirectionOverride = Vector2.zero;
+        }
         private void CompleteExitAndRelease()
         {
             _exitRoutine = null;
@@ -833,17 +637,13 @@ namespace PixelFlowClone.Entities
             if (!TrySetState(CollectorState.Pooled))
                 ForceState(CollectorState.Pooled);
 
-            GameEvents.RaiseCollectorExited(this);
-
-            if (PoolManager.HasInstance)
-                PoolManager.Instance.ReleaseCollector(this);
-            else
-                gameObject.SetActive(false);
+            ExitCompleted?.Invoke(this);
         }
 
         public void ResetFromPool()
         {
             ResetShotShake();
+            ResetExitOverrides();
 
             if (_exitRoutine != null)
             {
@@ -862,9 +662,6 @@ namespace PixelFlowClone.Entities
             CurrentMoveDirection = Vector2.right;
             transform.localScale = _defaultScale;
             ResetFacing();
-            _nextConsumeTime = 0f;
-            _hasConsumeLane = false;
-            _consumeMoveDir = Vector2.right;
             _isOnRoundedCorner = false;
             _stateMachine.ResetTo(CollectorState.Pooled);
             if (_capacityLabel != null) _capacityLabel.text = string.Empty;
@@ -942,7 +739,7 @@ namespace PixelFlowClone.Entities
             target.enabled = source.enabled;
         }
 
-        private void PlayShotShake()
+        public void PlayShotShake()
         {
             if (_shotShakeVisual == null || !isActiveAndEnabled)
                 return;

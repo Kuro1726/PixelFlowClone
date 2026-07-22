@@ -62,15 +62,16 @@ namespace PixelFlowClone.Queue
             ApplySpacingFromLevel(level, config);
             EnsureAnchors();
 
-            if (GridManager.HasInstance)
+            if (CollectorFlowCoordinator.HasInstance &&
+                CollectorFlowCoordinator.Instance.TryGetPlayfield(out CollectorPlayfieldSnapshot playfield))
             {
                 float margin = pathMargin > 0.01f
                     ? pathMargin
                     : LevelLayout.ResolveConveyorPathMargin(config);
 
                 Vector2 target = LevelLayout.GetPlayfieldQueueWorldPosition(
-                    GridManager.Instance.GridCenterWorld,
-                    GridManager.Instance.PlayfieldSize,
+                    playfield.Center,
+                    playfield.Size,
                     level,
                     margin,
                     config);
@@ -98,8 +99,8 @@ namespace PixelFlowClone.Queue
 
         private static GameConfigSO ResolveConfig()
         {
-            if (ConveyorPathManager.HasInstance)
-                return ConveyorPathManager.Instance.Config;
+            if (CollectorFlowCoordinator.HasInstance)
+                return CollectorFlowCoordinator.Instance.Config;
             return null;
         }
 

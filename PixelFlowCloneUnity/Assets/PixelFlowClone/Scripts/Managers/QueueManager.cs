@@ -3,7 +3,6 @@ using PixelFlowClone.Core;
 using PixelFlowClone.Data;
 using PixelFlowClone.Entities;
 using PixelFlowClone.Queue;
-using PixelFlowClone.Utils;
 using UnityEngine;
 
 namespace PixelFlowClone.Managers
@@ -12,13 +11,14 @@ namespace PixelFlowClone.Managers
     /// Coordinates waiting stack and horizontal queue slots. Tap dispatch from waiting goes
     /// straight to the conveyor (never into queue slots). Enqueue / queue dispatch come in P2-08+.
     /// </summary>
-    public class QueueManager : Singleton<QueueManager>
+    public class QueueManager : Singleton<QueueManager>, ICollectorQueueFlow
     {
         [SerializeField] private WaitingSlotController _waiting;
         [SerializeField] private QueueSlotController _queueSlots;
 
         public int OccupiedSlots => _queueSlots != null ? _queueSlots.OccupiedCount : 0;
         public int MaxSlots => _queueSlots != null ? _queueSlots.MaxSlots : 5;
+        public int WaitingCount => _waiting != null ? _waiting.Count : 0;
 
         public IReadOnlyList<CollectorUnit> QueueSlotUnits =>
             _queueSlots != null ? _queueSlots.Units : System.Array.Empty<CollectorUnit>();
@@ -77,47 +77,8 @@ namespace PixelFlowClone.Managers
         /// </summary>
         public bool TryDispatchFromWaiting(CollectorUnit unit)
         {
-            if (unit == null || _waiting == null)
-                return false;
-
-            if (!_waiting.Contains(unit) || !_waiting.IsFront(unit))
-                return false;
-
-            if (unit.State != CollectorState.InWaitingStack)
-                return false;
-
-            if (!ConveyorPathManager.HasInstance)
-            {
-                Debug.LogWarning("[QueueManager] ConveyorPathManager missing.");
-                return false;
-            }
-
-            ConveyorPathManager conveyor = ConveyorPathManager.Instance;
-            if (!QueueStateLogic.CanDispatchFromWaiting(
-                    unit.State,
-                    isWaitingFront: true,
-                    conveyor.ActiveCount,
-                    conveyor.MaxCapacity))
-            {
-                PlayConveyorFullFeedback(unit);
-                return false;
-            }
-
-            CollectorUnit popped = _waiting.TryPop(unit);
-            if (popped == null)
-                return false;
-
-            if (!conveyor.DispatchToConveyor(popped))
-            {
-                _waiting.RestoreFront(popped);
-                Debug.LogWarning("[QueueManager] Dispatch failed after pop — unit restored to waiting stack.");
-                PlayConveyorFullFeedback(popped);
-                return false;
-            }
-
-            Debug.Log($"[QueueManager] Waiting → Conveyor OK: color={popped.Color} capacity={popped.Capacity} waitingLeft={_waiting.Count}");
-            GameEvents.RaiseCollectorDispatchedFromWaiting(popped);
-            return true;
+            return CollectorFlowCoordinator.HasInstance &&
+                   CollectorFlowCoordinator.Instance.TryDispatchFromWaiting(unit);
         }
 
         /// <summary>
@@ -126,47 +87,8 @@ namespace PixelFlowClone.Managers
         /// </summary>
         public bool TryEnqueueFromLap(CollectorUnit unit)
         {
-            if (unit == null || _queueSlots == null)
-                return false;
-
-            if (unit.State != CollectorState.OnConveyor || unit.Capacity <= 0)
-                return false;
-
-            if (!QueueStateLogic.CanEnqueueFromLap(
-                    unit.State,
-                    unit.Capacity,
-                    OccupiedSlots,
-                    MaxSlots))
-            {
-                Debug.Log("[QueueManager] Lap enqueue failed — queue is full. Defeat.");
-                if (GameManager.HasInstance)
-                    GameManager.Instance.DeclareDefeat();
-                else
-                    Debug.LogError("[QueueManager] Cannot declare defeat — GameManager missing.");
-
-                return false;
-            }
-
-            int slotIndex = _queueSlots.TryAssignFirstEmpty(unit);
-            if (slotIndex < 0)
-            {
-                Debug.Log("[QueueManager] Lap enqueue failed — queue is full. Defeat.");
-                if (GameManager.HasInstance)
-                    GameManager.Instance.DeclareDefeat();
-                else
-                    Debug.LogError("[QueueManager] Cannot declare defeat — GameManager missing.");
-
-                return false;
-            }
-
-            if (ConveyorPathManager.HasInstance)
-                ConveyorPathManager.Instance.UnregisterUnit(unit);
-
-            NotifyQueueCountChanged();
-            Debug.Log(
-                $"[QueueManager] Conveyor → Queue OK: slot={slotIndex}, " +
-                $"color={unit.Color}, capacity={unit.Capacity}");
-            return true;
+            return CollectorFlowCoordinator.HasInstance &&
+                   CollectorFlowCoordinator.Instance.TryEnqueueFromLap(unit);
         }
 
         /// <summary>
@@ -175,14 +97,8 @@ namespace PixelFlowClone.Managers
         /// </summary>
         public bool TryDispatchFromQueue(int slotIndex)
         {
-            if (_queueSlots == null || !_queueSlots.IsValidSlot(slotIndex))
-                return false;
-
-            CollectorUnit unit = _queueSlots.GetUnit(slotIndex);
-            if (unit == null || unit.State != CollectorState.InQueueSlot)
-                return false;
-
-            return TryDispatchFromQueue(unit);
+            return CollectorFlowCoordinator.HasInstance &&
+                   CollectorFlowCoordinator.Instance.TryDispatchFromQueue(slotIndex);
         }
 
         /// <summary>
@@ -190,55 +106,84 @@ namespace PixelFlowClone.Managers
         /// </summary>
         public bool TryDispatchFromQueue(CollectorUnit unit)
         {
+            return CollectorFlowCoordinator.HasInstance &&
+                   CollectorFlowCoordinator.Instance.TryDispatchFromQueue(unit);
+        }
+
+        internal bool CanDispatchFromWaiting(CollectorUnit unit)
+        {
+            if (unit == null || _waiting == null)
+                return false;
+
+            return _waiting.Contains(unit) &&
+                   _waiting.IsFront(unit) &&
+                   unit.State == CollectorState.InWaitingStack;
+        }
+
+        internal CollectorUnit PopWaitingUnit(CollectorUnit unit)
+        {
+            return _waiting != null ? _waiting.TryPop(unit) : null;
+        }
+
+        internal void RestoreWaitingUnit(CollectorUnit unit)
+        {
+            _waiting?.RestoreFront(unit);
+        }
+
+        internal bool TryGetQueueUnit(int slotIndex, out CollectorUnit unit)
+        {
+            unit = null;
+            if (_queueSlots == null || !_queueSlots.IsValidSlot(slotIndex))
+                return false;
+
+            unit = _queueSlots.GetUnit(slotIndex);
+            return unit != null && unit.State == CollectorState.InQueueSlot;
+        }
+
+        internal bool CanDispatchFromQueue(CollectorUnit unit)
+        {
             if (unit == null || _queueSlots == null)
                 return false;
 
-            if (!_queueSlots.Contains(unit) || unit.State != CollectorState.InQueueSlot)
-                return false;
+            return _queueSlots.Contains(unit) && unit.State == CollectorState.InQueueSlot;
+        }
 
-            if (!ConveyorPathManager.HasInstance)
-            {
-                Debug.LogWarning("[QueueManager] ConveyorPathManager missing.");
-                return false;
-            }
+        internal bool CanEnqueueFromLap(CollectorUnit unit)
+        {
+            return unit != null &&
+                   _queueSlots != null &&
+                   unit.State == CollectorState.OnConveyor &&
+                   unit.Capacity > 0;
+        }
+        internal int AssignFirstQueueSlot(CollectorUnit unit)
+        {
+            return _queueSlots != null ? _queueSlots.TryAssignFirstEmpty(unit) : -1;
+        }
 
-            ConveyorPathManager conveyor = ConveyorPathManager.Instance;
-            if (!QueueStateLogic.CanDispatchFromQueue(
-                    unit.State,
-                    isInQueueSlot: true,
-                    conveyor.ActiveCount,
-                    conveyor.MaxCapacity))
-            {
-                PlayConveyorFullFeedback(unit);
-                return false;
-            }
+        internal int IndexOfQueueUnit(CollectorUnit unit)
+        {
+            return _queueSlots != null ? _queueSlots.IndexOf(unit) : -1;
+        }
 
-            int slotIndex = _queueSlots.IndexOf(unit);
-            CollectorUnit removed = _queueSlots.TryRemove(unit);
-            if (removed == null)
-                return false;
+        internal CollectorUnit RemoveQueueUnit(CollectorUnit unit)
+        {
+            return _queueSlots != null ? _queueSlots.TryRemove(unit) : null;
+        }
 
-            if (!conveyor.DispatchToConveyor(removed))
-            {
-                _queueSlots.TryAssign(slotIndex, removed);
-                NotifyQueueCountChanged();
-                Debug.LogWarning("[QueueManager] Queue dispatch failed — unit restored to slot.");
-                PlayConveyorFullFeedback(removed);
-                return false;
-            }
+        internal bool RestoreQueueUnit(int slotIndex, CollectorUnit unit)
+        {
+            return _queueSlots != null && _queueSlots.TryAssign(slotIndex, unit);
+        }
 
+        internal void NotifyQueueStateChanged()
+        {
             NotifyQueueCountChanged();
-            Debug.Log(
-                $"[QueueManager] Queue → Conveyor OK: slot={slotIndex}, " +
-                $"color={removed.Color}, capacity={removed.Capacity}");
-            GameEvents.RaiseCollectorDispatchedFromQueue(removed);
-            return true;
         }
 
         /// <summary>
         /// Reject feedback: SFX via GameEvents, shake on the collector (P3-20).
         /// </summary>
-        private static void PlayConveyorFullFeedback(CollectorUnit unit)
+        internal void PlayConveyorFullFeedback(CollectorUnit unit)
         {
             Debug.Log(
                 $"[QueueManager] Dispatch rejected — conveyor full. " +

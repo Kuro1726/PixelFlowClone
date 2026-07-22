@@ -16,6 +16,7 @@ namespace PixelFlowClone.Core
         [SerializeField] private GridManager _grid;
         [SerializeField] private ConveyorPathManager _conveyor;
         [SerializeField] private QueueManager _queue;
+        [SerializeField] private CollectorFlowCoordinator _collectorFlow;
         [SerializeField] private InputManager _input;
         [SerializeField] private GameplayHUD _hud;
         [SerializeField] private Sprite _victoryPanelSprite;
@@ -35,6 +36,7 @@ namespace PixelFlowClone.Core
         public GridManager Grid => _grid;
         public ConveyorPathManager Conveyor => _conveyor;
         public QueueManager Queue => _queue;
+        public CollectorFlowCoordinator CollectorFlow => _collectorFlow;
         public InputManager Input => _input;
         public GameplayHUD Hud => _hud;
         public VictoryPopup VictoryPopup => _victoryPopup;
@@ -54,6 +56,7 @@ namespace PixelFlowClone.Core
 
             Instance = this;
             ResolveMissingReferences();
+            EnsureCollectorFlowCoordinator();
             PersistentManagers.EnsureGameManager();
             PersistentManagers.EnsureLevelManager();
             EnsureHud();
@@ -114,14 +117,19 @@ namespace PixelFlowClone.Core
             ConveyorPathManager conveyor,
             QueueManager queue,
             InputManager input,
-            GameplayHUD hud = null)
+            GameplayHUD hud = null,
+            CollectorFlowCoordinator collectorFlow = null)
         {
             _grid = grid;
             _conveyor = conveyor;
             _queue = queue;
             _input = input;
+            if (collectorFlow != null)
+                _collectorFlow = collectorFlow;
             if (hud != null)
                 _hud = hud;
+
+            _collectorFlow?.Configure(_queue, _conveyor, _grid);
         }
 
         private void ResolveMissingReferences()
@@ -132,10 +140,23 @@ namespace PixelFlowClone.Core
                 _conveyor = GetComponentInChildren<ConveyorPathManager>(true);
             if (_queue == null)
                 _queue = GetComponentInChildren<QueueManager>(true);
+            if (_collectorFlow == null)
+                _collectorFlow = GetComponentInChildren<CollectorFlowCoordinator>(true);
             if (_input == null)
                 _input = GetComponentInChildren<InputManager>(true);
             if (_hud == null)
                 _hud = FindFirstObjectByType<GameplayHUD>();
+        }
+
+        private void EnsureCollectorFlowCoordinator()
+        {
+            if (_collectorFlow == null)
+                _collectorFlow = GetComponent<CollectorFlowCoordinator>();
+
+            if (_collectorFlow == null)
+                _collectorFlow = gameObject.AddComponent<CollectorFlowCoordinator>();
+
+            _collectorFlow.Configure(_queue, _conveyor, _grid);
         }
 
         private void EnsureHud()

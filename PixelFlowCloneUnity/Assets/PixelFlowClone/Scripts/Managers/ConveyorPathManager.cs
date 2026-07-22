@@ -13,7 +13,7 @@ namespace PixelFlowClone.Managers
     /// Scene-scoped manager for the closed conveyor loop: waypoint graph, capacity,
     /// and unit registration. Fires lap-complete when a unit returns to the entry waypoint.
     /// </summary>
-    public class ConveyorPathManager : Singleton<ConveyorPathManager>
+    public class ConveyorPathManager : Singleton<ConveyorPathManager>, ICollectorConveyorFlow
     {
         [Header("Scene References")]
         [SerializeField] private Transform _pathRoot;
@@ -99,19 +99,10 @@ namespace PixelFlowClone.Managers
 
         public static int CountAliveCollectors()
         {
-            int total = 0;
-            if (HasInstance)
-                total += Instance.ActiveCount;
+            if (CollectorFlowCoordinator.HasInstance)
+                return CollectorFlowCoordinator.Instance.CountAliveCollectors();
 
-            if (QueueManager.HasInstance)
-            {
-                QueueManager queue = QueueManager.Instance;
-                if (queue.Waiting != null)
-                    total += queue.Waiting.Count;
-                total += queue.OccupiedSlots;
-            }
-
-            return total;
+            return HasInstance ? Instance.ActiveCount : 0;
         }
 
         protected override void OnSingletonAwake()
@@ -143,11 +134,12 @@ namespace PixelFlowClone.Managers
             if (level != null)
                 _pathData = level.PathReference;
 
-            if (GridManager.HasInstance)
+            if (CollectorFlowCoordinator.HasInstance &&
+                CollectorFlowCoordinator.Instance.TryGetPlayfield(out CollectorPlayfieldSnapshot playfield))
             {
                 RebuildPathAroundPlayfield(
-                    GridManager.Instance.GridCenterWorld,
-                    GridManager.Instance.PlayfieldSize,
+                    playfield.Center,
+                    playfield.Size,
                     PathMargin);
             }
             else
@@ -157,9 +149,10 @@ namespace PixelFlowClone.Managers
 
             float configured = _config != null ? _config.RaycastDistance : 20f;
             float playfieldReach = 8f;
-            if (GridManager.HasInstance)
+            if (CollectorFlowCoordinator.HasInstance &&
+                CollectorFlowCoordinator.Instance.TryGetPlayfield(out playfield))
             {
-                Vector2 size = GridManager.Instance.PlayfieldSize;
+                Vector2 size = playfield.Size;
                 playfieldReach = Mathf.Max(size.x, size.y) * 0.5f + PathMargin + 1f;
             }
 

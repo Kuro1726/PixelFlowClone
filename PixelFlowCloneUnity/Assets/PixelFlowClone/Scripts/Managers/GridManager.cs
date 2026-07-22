@@ -186,8 +186,8 @@ namespace PixelFlowClone.Managers
 
             if (block != null)
             {
-                GameConfigSO config = ConveyorPathManager.HasInstance
-                    ? ConveyorPathManager.Instance.Config
+                GameConfigSO config = CollectorFlowCoordinator.HasInstance
+                    ? CollectorFlowCoordinator.Instance.Config
                     : null;
                 float punchScale = config != null ? config.BlockHitPunchScale : 1.15f;
                 float punchDuration = config != null ? config.BlockHitPunchDuration : 0.07f;
