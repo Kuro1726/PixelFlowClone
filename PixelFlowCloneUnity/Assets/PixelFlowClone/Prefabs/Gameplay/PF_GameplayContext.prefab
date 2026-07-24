@@ -104,6 +104,7 @@ MonoBehaviour:
   _grid: {fileID: 7650303448151652043}
   _conveyor: {fileID: 5681497139379383513}
   _queue: {fileID: 8833700601773830824}
+  _collectorFlow: {fileID: 0}
   _input: {fileID: 8663791217256795881}
   _hud: {fileID: 0}
   _victoryPanelSprite: {fileID: 21300000, guid: 3d5a906fb5364cc98d7a68efc96962e4, type: 3}

@@ -30,7 +30,7 @@ namespace PixelFlowClone.Entities
         [Tooltip("World degrees the sprite nose points at local rotation 0. Right=0, Up=90, Left=180, Down=-90.")]
         [SerializeField] private float _spriteNoseAngleAtRest = 90f;
         [Tooltip("Seconds used to blend the collector's rotation while turning on the conveyor.")]
-        [SerializeField] [Min(0f)] private float _turnSmoothTime = 0.08f;
+        [SerializeField] [Min(0f)] private float _turnSmoothTime = 0.12f;
         [SerializeField] [Min(0.01f)] private float _shotShakeDuration = 0.12f;
         [SerializeField] [Min(0f)] private float _shotShakeAmplitude = 0.045f;
         [SerializeField] [Min(1f)] private float _shotShakeOscillations = 3f;
@@ -46,15 +46,17 @@ namespace PixelFlowClone.Entities
         private bool _hasExitFlyDirectionOverride;
         private Vector2 _exitFlyDirectionOverride = Vector2.zero;
         private bool _isOnRoundedCorner;
-        private float _turnAngularVelocity;
         private Transform _shotShakeVisual;
         private Vector3 _shotShakeRestLocalPosition;
         private float _shotShakeElapsed;
         private bool _isShotShakeActive;
         /// <summary>After first successful consume this lap, face inward until lap ends.</summary>
         private bool _faceInwardForRestOfLap;
-        private Vector2 _inwardFacingDirection = Vector2.zero;
+        private bool _hasFacingTarget;
+        private float _currentFacingAngle;
+        private float _targetFacingAngle;
 
+        private float _turnAngularVelocity;
         public static event Action<CollectorUnit> Tapped;
         public static event Action<CollectorUnit, Vector2, Vector2> MovementAdvanced;
         public static event Action<CollectorUnit> ConsumePreviewRequested;
@@ -232,9 +234,8 @@ namespace PixelFlowClone.Entities
         public void PrepareConveyorFacing()
         {
             _faceInwardForRestOfLap = false;
-            _inwardFacingDirection = Vector2.zero;
             _isOnRoundedCorner = false;
-            ApplyFacingFromMoveDirection(Vector2.right, true);
+            SetFacingTarget(Vector2.right, true);
         }
 
         public void SuppressConsumeFor(float seconds)
@@ -309,6 +310,7 @@ namespace PixelFlowClone.Entities
             }
 
             Vector2 after = _rigidbody.position;
+            TickFacingRotation(deltaTime);
             MovementAdvanced?.Invoke(this, before, after);
             return reachedWaypoint;
         }
@@ -342,86 +344,89 @@ namespace PixelFlowClone.Entities
             return Mathf.Abs(direction.x) > axisEpsilon && Mathf.Abs(direction.y) > axisEpsilon;
         }
 
+        private static Vector2 RotateLeft90(Vector2 direction)
+        {
+            return new Vector2(-direction.y, direction.x);
+        }
+
         /// <summary>
         /// Before first shot this lap: face along the belt.
-        /// After first successful consume: keep facing inward toward the grid until lap ends.
+        /// After first successful consume: face left of each waypoint segment until lap ends.
         /// </summary>
-        private void RefreshVisualFacing(Vector2 pathTangent)
+        private void RefreshVisualFacing(Vector2 pathDirection)
         {
-            if (_faceInwardForRestOfLap)
-            {
-                Vector2 inward = _inwardFacingDirection;
-                if (inward.sqrMagnitude > 0.0001f)
-                {
-                    ApplyFacingFromMoveDirection(inward);
-                    return;
-                }
-            }
-
-            ApplyFacingFromMoveDirection(pathTangent);
+            Vector2 facingDirection = _faceInwardForRestOfLap
+                ? RotateLeft90(pathDirection)
+                : pathDirection;
+            SetFacingTarget(facingDirection, snapDirection: false);
         }
 
         public void FaceInwardForRestOfLap(Vector2 inwardDirection)
         {
-            if (inwardDirection.sqrMagnitude < 0.0001f)
+            if (_faceInwardForRestOfLap || inwardDirection.sqrMagnitude < 0.0001f)
                 return;
 
             _faceInwardForRestOfLap = true;
-            _inwardFacingDirection = inwardDirection.normalized;
-            ApplyFacingFromMoveDirection(_inwardFacingDirection);
+            SetFacingTarget(inwardDirection, snap: true);
         }
 
         public void ResetLapFacing()
         {
             _faceInwardForRestOfLap = false;
-            _inwardFacingDirection = Vector2.zero;
         }
 
         /// <summary>
-        /// Points the sprite nose along <paramref name="dir"/> (belt move or shoot inward).
+        /// Sets the target sprite nose direction.
         /// </summary>
-        private void ApplyFacingFromMoveDirection(Vector2 dir, bool snap = false)
+        private void SetFacingTarget(Vector2 dir, bool snap = false, bool snapDirection = true)
         {
             if (dir.sqrMagnitude < 0.0001f)
                 return;
 
-            // Atan2: angle of desired nose from +X. Subtract art's rest nose angle.
-            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - _spriteNoseAngleAtRest;
-            SetFacingAngle(angle, snap);
+            dir = snapDirection ? SnapToCardinal(dir) : dir.normalized;
+            _targetFacingAngle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - _spriteNoseAngleAtRest;
+            _hasFacingTarget = true;
+            if (snap)
+                ApplyFacingAngle(_targetFacingAngle, true);
         }
 
         private void ResetFacing()
         {
             _faceInwardForRestOfLap = false;
-            _inwardFacingDirection = Vector2.zero;
             // Waiting / queue / pool: authored art pose (nose up at rest).
-            SetFacingAngle(0f, true);
+            ApplyFacingAngle(0f, true);
         }
 
-        private void SetFacingAngle(float zDegrees, bool snap = false)
+        private void TickFacingRotation(float deltaTime)
         {
-            float appliedAngle = zDegrees;
-            if (!snap && _turnSmoothTime > 0.0001f)
+            if (!_hasFacingTarget)
+                return;
+
+            ApplyFacingAngle(_targetFacingAngle, false, deltaTime);
+        }
+
+        private void ApplyFacingAngle(float zDegrees, bool snap = false, float deltaTime = 0f)
+        {
+            if (snap || _turnSmoothTime <= 0.0001f)
             {
-                float currentAngle = _rigidbody != null
-                    ? _rigidbody.rotation
-                    : transform.eulerAngles.z;
-                appliedAngle = Mathf.SmoothDampAngle(
-                    currentAngle,
+                _turnAngularVelocity = 0f;
+                _currentFacingAngle = zDegrees;
+            }
+            else
+            {
+                float stepDelta = deltaTime > 0f ? deltaTime : Time.fixedDeltaTime;
+                _currentFacingAngle = Mathf.SmoothDampAngle(
+                    _currentFacingAngle,
                     zDegrees,
                     ref _turnAngularVelocity,
                     _turnSmoothTime,
                     Mathf.Infinity,
-                    Time.fixedDeltaTime);
-            }
-            else
-            {
-                _turnAngularVelocity = 0f;
+                    stepDelta);
             }
 
-            transform.rotation = Quaternion.Euler(0f, 0f, appliedAngle);
+            transform.rotation = Quaternion.Euler(0f, 0f, _currentFacingAngle);
             if (_rigidbody != null)
-                _rigidbody.rotation = appliedAngle;
+                _rigidbody.rotation = _currentFacingAngle;
 
             SnapCapacityLabelAbove();
         }
